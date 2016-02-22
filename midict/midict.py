@@ -571,15 +571,16 @@ class MultiIndexDict(AttrOrdDict):
     '''
     A dictionary that has multiple indices and can index multiple items.
 
+
     Consider a table-like data set (e.g., a user table):
 
-        +---------+---------+---------+
-        |  name   |   uid   |   ip    |
-        +=========+=========+=========+
-        |  jack   |    1    |  192.1  |
-        +---------+---------+---------+
-        |  tony   |    2    |  192.2  |
-        +---------+---------+---------+
+    +---------+---------+---------+
+    |  name   |   uid   |   ip    |
+    +=========+=========+=========+
+    |  jack   |    1    |  192.1  |
+    +---------+---------+---------+
+    |  tony   |    2    |  192.2  |
+    +---------+---------+---------+
 
     In each column, elements are unique and hashable (suitable for dict keys).
 
@@ -599,32 +600,32 @@ class MultiIndexDict(AttrOrdDict):
     More powerful functions are supported by MultiIndexDict via the advanced
     indexing syntax:
 
-        1. To use any index (column) as the "keys", and other one or more
-           indices as the "values", just specify the indices as follows::
+    1. To use any index (column) as the "keys", and other one or more
+       indices as the "values", just specify the indices as follows::
 
-               user[index1:key, index2]
-               # e.g.:
-               user['name':'jack', 'uid'] -> 1
+           user[index1:key, index2]
+           # e.g.:
+           user['name':'jack', 'uid'] -> 1
 
-           Here, index `index1` is used as the "keys", and `key` is an element
-           in `index1` to locate the row of record in the table. `index2` can
-           be one or more indices to get the value(s) from the row of record.
+       Here, index `index1` is used as the "keys", and `key` is an element
+       in `index1` to locate the row of record in the table. `index2` can
+       be one or more indices to get the value(s) from the row of record.
 
-        2. Index multiple items at the same time::
+    2. Index multiple items at the same time::
 
-               user['name':'jack', ['uid','ip']] -> [1, '192.1']
-               user['name':'jack', 1:] -> [1, '192.1']
+           user['name':'jack', ['uid','ip']] -> [1, '192.1']
+           user['name':'jack', 1:] -> [1, '192.1']
 
-        3. Index via various shortcuts::
+    3. Index via various shortcuts::
 
-               user['jack'] -> [1, '192.1']
-               user[:'192.1'] -> ['jack', 1]
-               user['jack', :] -> ['jack', 1, '192.1']
+           user['jack'] -> [1, '192.1']
+           user[:'192.1'] -> ['jack', 1]
+           user['jack', :] -> ['jack', 1, '192.1']
 
-        4. Use attribute syntax to access a key if it is a valid Python
-           identifier::
+    4. Use attribute syntax to access a key if it is a valid Python
+       identifier::
 
-               user.jack -> [1, '192.1']
+           user.jack -> [1, '192.1']
 
 
     A MultiIndexDict with 2 indices is fully compatible with the normal dict
@@ -732,6 +733,9 @@ class MultiIndexDict(AttrOrdDict):
 
         color.indices.name.red.hex # -> '#FF0000'
         <==> color.indices['name']['red']['hex']
+
+
+
 
 
     '''
