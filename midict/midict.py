@@ -100,7 +100,6 @@ class AttrDict(dict):
         """
         # Note: this allows normal attributes access in the __init__ method
 
-#        print '__setattr__', item, value
         super_setattr = super(AttrDict, self).__setattr__
 
         if '_AttrDict__attr2item' not in self.__dict__: # slot??
@@ -122,15 +121,18 @@ class AttrDict(dict):
             self.__delitem__(item)
 
 
+def _index2key(keys, index):
+    'Convert int `index` to the corresponding key in `keys`'
+    try:
+        return keys[index]
+    except IndexError:
+        raise KeyError('Index out of range of keys: %s' % (index,))
+
 
 def convert_index_keys(d, item):
     # use a separate function rather than a method inside the class IndexDict
     '''
-    convert `item` in various types to a list of keys.
-    `item` can be a single key, a tuple, list or slice.
-    slice format: "key_start : key_stop : step"
-    the `item` can also be the index of the item.
-    setting items using int or slice only supports existing keys, not new keys
+    Convert `item` in various types to a single key or a list of keys.
     '''
 
     keys = d.keys()
@@ -138,20 +140,14 @@ def convert_index_keys(d, item):
 
     # int item will be interpreted as the index rather than key!!
     if isinstance(item, int):
-        try:
-            item = keys[item]
-            single = True
-        except IndexError:
-            raise KeyError('Index out of range of keys: %s' % (item,))
+        item = _index2key(keys, item)
+        single = True
 
     elif isinstance(item, (tuple, list)):
         item2 = []
         for i in item:
             if isinstance(i, int):
-                try:
-                    i = keys[i]
-                except IndexError:
-                    raise KeyError('Index out of range of keys: %s' % (i,))
+                i = _index2key(keys, i)
             item2.append(i)
         item = item2
         single = False
@@ -186,15 +182,58 @@ def _check_IndexDict_key(key):
 
 
 class IndexDict(dict):
-    # similar to MultiDict, but not subclass of it
     '''
-    A dict of non-int type keys that can use a key (not int type)
-    or the index of one or more keys (int or slice type) to
-    get/set/delete the value(s).
+    A dictionary that supports flexible indexing (get/set/delete) of
+    multiple keys via a int, tuple, list or slice object.
+
+    The type of a valid key in IndexDict should not be int, tuple, or NoneType.
+
+    To index one or more items, use a proper `item` argument with the
+    bracket syntax: `d[item]`. The possible types and contents of `item`
+    as well as the corresponding values are summarized as follows:
+
+    ============= ================================== ======================
+        type        content of the `item` argument    corresponding values
+    ============= ================================== ======================
+    int           the index of a key in d.keys()     the value of the key
+    tuple/list    multiple keys or indices of keys   list of values
+    slice         "key_start : key_stop : step"      list of values
+    other types   a normal key                       the value of the key
+    ============= ================================== ======================
+
+    The tuple/list syntax can mix keys with indices of keys.
+
+    The slice syntax means a range of keys (like the normal list slicing),
+    and the `key_start` and `key_stop` parameter can be a key, the index
+    of a key, or None (which can be omitted).
+
+    When setting items, the slice and int syntax (including int in the tuple/list
+    syntax) can only be used to change values of existing keys, rather than
+    set values for new keys.
+
+
+    Examples:
+
+    d = IndexDict(a=1,b=2,c=3)
+
+    d -> {'a': 1, 'c': 3, 'b': 2}
+    d.keys() -> ['a', 'c', 'b']
+
+    d['a'] -> 1
+    d[0] -> 1
+    d['a','b'] <==> d[('a','b')] <==> d[['a','b']] -> [1, 2]
+    d[:] -> [1,3,2]
+    d['a':'b'] <==> d[0:2] <==> d['a':2] <==> d['a':-1] -> [1, 3]
+    d[0::2] -> [1, 2]
+
+    d[0] = 10 # d -> {'a': 10, 'c': 3, 'b': 2}
+    d['a':-1] = [10, 30] # d -> {'a': 10, 'c': 30, 'b': 2}
+
+    d[5] = 10 -> KeyError: 'Index out of range of keys: 5'
     '''
 
     def __init__(self, *args, **kw):
-        'check key is not int type'
+        'check key is valid'
         if args:
             for key, value in args[0]:
                 _check_IndexDict_key(key)
@@ -202,9 +241,8 @@ class IndexDict(dict):
 
 #
     def __getitem__(self, item):
-        '''get item using key (not int type) or index of key (int or slice type).
-        d[key] -> value
-        d[index_of_key] -> value
+        '''
+        Get one or more items using flexible indexing.
         '''
         item2, single = convert_index_keys(self, item)
         super_getitem = super(IndexDict, self).__getitem__
@@ -214,17 +252,13 @@ class IndexDict(dict):
             return map(super_getitem, item2)
 
 
-
     def __setitem__(self, item, value):
-        '''set item using key (not int type) or index of key (int or slice type).
-        d[existing_key] = value
-        d[not_existing_key] = value # assign value to a new key
+        '''
+        Set one or more items using flexible indexing.
 
-        d[index_of_existing_key] = value
-
-        A KeyError will raise if the key does not already exist:
-
-        d[index_of_not_existing_key] = value -> KeyError
+        The slice and int syntax (including int in the tuple/list syntax) can
+        only be used to change values of existing keys, rather than set values
+        for new keys.
         '''
         item2, single = convert_index_keys(self, item)
         super_setitem = super(IndexDict, self).__setitem__
@@ -240,7 +274,7 @@ class IndexDict(dict):
 
     def __delitem__(self, item):
         '''
-        delete item using key (not int type) or index of key (int or slice type).
+        Delete one or more items using flexible indexing.
         '''
         item2, single = convert_index_keys(self, item)
         super_delitem = super(IndexDict, self).__delitem__
@@ -251,7 +285,7 @@ class IndexDict(dict):
 
 
     def __contains__(self, item):
-        'check if the dictionary contains one or multiple items (by key or index of key)'
+        'Check if the dictionary contains one or more items using flexible indexing.'
         try:
             self.__getitem__(item)
             return True
@@ -268,7 +302,7 @@ class IdxOrdDict(IndexDict, AttrDict, OrderedDict):
 
 
 def _check_index_name(name):
-    'check if index name is valid'
+    'Check if index name is valid'
     if not isinstance(name, (str,unicode)):
         raise TypeError('Index name must be a str or unicode. '
             'Found type %s for %s' % (type(name), name))
@@ -276,7 +310,7 @@ def _check_index_name(name):
 
 def _get_unique_name(name, collection):
     '''
-    generate a unique name by appending a sequence number to
+    Generate a unique name by appending a sequence number to
     the original name so that it is not contained in the collection.
     `collection` has a __contains__ method (tuple, list, dict, etc.)
     '''
@@ -291,7 +325,7 @@ def _get_unique_name(name, collection):
 
 
 def _get_value_len(value):
-    'get length of value. if value has no len(), convert it to list first'
+    'Get length of value. if value has no len(), convert it to list first'
     try:
         Nvalue = len(value)
     except TypeError:
@@ -303,30 +337,26 @@ def _get_value_len(value):
 
 def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
     '''
-    d[1]
-    d[1,]
-    # d[1, 'name']
-    d[1, ['name', 'ip']]
-    d[1, 'name':'ip']
-    # d[1, ['name', 'ip'], 'other']
+    Parse the arguments for indexing in MultiIndexDict.
 
-    d[:'192.1']
-    d[:'192.1',]
-    d['uid':2, 'name']
-    d['uid':2, 'name', 'ip']
-    d['uid':2, ('name', 'ip')]
-    d['uid':2, ['name', 'ip']]
-    d['uid':2, 'name':'ip']
-    d['uid':2, 'uid':'ip']
-    d['uid':2, 0:9]
-    d['uid':2, 'uid':9]
+    Full syntax: `d[index1:key, index2]`.
+
+    `index2` can be flexible indexing (int, list, slice etc.) as in IndexDict.
+
+    Short syntax:
+
+    * d[key] <==> d[key,] <==> d[first_index:key, rest_index]
+    * d[:key] <==> d[:key,] <==> d[None:key] <==> d[last_index:key, rest_index]
+    * d[key, index2]  <==> d[first_index:key, index2] # this is valid
+      # only when index2 is a list or slice object
+    * d[index1:key, index2_1, index2_2, ...] <==> d[index1:key, (index2_1, index2_2, ...)]
+
     '''
     empty = len(self.indices) == 0
     if empty and not allow_new:
         raise KeyError('Item not found (dictionary is empty): %s' % (args,))
 
     names = self.indices.keys()
-    N = len(names)
 
     Nargs = len(args) if isinstance(args, tuple) else 1
 
@@ -402,24 +432,28 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
 
     # not empty:
 
-    if index1 is _default:
+    if index1 is _default: # not specified
         index1 = 0
-    elif index1 is None:
+    elif index1 is None: # slice syntax d[:key]
         index1 = -1
 
-    if index2 is _default:
-        if not isinstance(index1, int):
-            try:
-                index1 = names.index(index1) # use index, int type
-            except ValueError:
-                raise KeyError('Index not found: %s' % (index1,))
-        index2 = (index1 + 1) % N
+    if index2 is _default: # not specified
+        # index2 defaults to all indices except index1
+        if len(names) == 0:
+            raise KeyError('Index2 must be specified when only 1 index exists')
 
-    if isinstance(index1, int):
-        index1 = names[index1]
-    if isinstance(index2, int):
-        index2 = names[index2]
+        if isinstance(index1, int):
+            index1 = _index2key(names, index1)
 
+        index2 = [n for n in names if n != index1]
+        if len(index2) == 1: # single index
+            index2 = index2[0]
+#        index2 = (index1 + 1) % N
+
+#    if isinstance(index1, int):
+#        index1 = _index2key(names, index1)
+#    if isinstance(index2, int):
+#        index2 = _index2key(names, index2)
 
     try:
         index_d = self.indices[index1]
@@ -442,13 +476,7 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
 
 def _mid_init(self, *args, **kw):
     '''
-    (items, **kw)
-    (dict, **kw)
-    (MultiIndexDict, **kw)
-
-    (items, names, **kw)
-    (dict, names, **kw)
-    (MultiIndexDict, names **kw)
+    Separate __init__ function of MultiIndexDict
     '''
 
     items, names = [], None
@@ -541,120 +569,205 @@ def _mid_init(self, *args, **kw):
 
 class MultiIndexDict(AttrOrdDict):
     '''
-    Easily accessible dict with multiple indices.
+    A dictionary that has multiple indices and can index multiple items.
 
-    Example:
+    Consider a table-like data set (e.g., a user table):
 
-    d = MultiIndexDict(['uid', 'name', 'ip'],
-                       [[1, 'jack', '192.1'],
-                        [2, 'tony', '192.2']])
+        +---------+---------+---------+
+        |  name   |   uid   |   ip    |
+        +=========+=========+=========+
+        |  jack   |    1    |  192.1  |
+        +---------+---------+---------+
+        |  tony   |    2    |  192.2  |
+        +---------+---------+---------+
 
-    * internal data structure: 3 levels of OrderedDict
+    In each column, elements are unique and hashable (suitable for dict keys).
 
-    d -> OrderedDict([
-        ('uid', OrderedDict([
-            (1, OrderedDict([('uid', 1), ('name', 'jack'), ('ip', '192.1')])),
-            (2, OrderedDict([('uid', 2), ('name', 'tony'), ('ip', '192.2')]))])),
-        ('name', OrderedDict([
-            ('jack', OrderedDict([('uid', 1), ('name', 'jack'), ('ip', '192.1')])),
-            ('tony', OrderedDict([('uid', 2), ('name', 'tony'), ('ip', '192.2')]))])),
-        ('ip', OrderedDict([
-            ('192.1', OrderedDict([('uid', 1), ('name', 'jack'), ('ip', '192.1')])),
-            ('192.2', OrderedDict([('uid', 2), ('name', 'tony'), ('ip', '192.2')]))]))
-    ])
+    A multi-index `user` dictionary can be constructed like this::
 
+        user = MultiIndexDict([['jack', 1, '192.1'],
+                               ['tony', 2, '192.2']],
+                              ['name', 'uid', 'ip'])
 
-    * normal indexing of the internal dicts
-    d['name']['jack']['uid'] -> 1
-    d['name']['jack'][['uid','ip']] -> [1, '192.1'] # multiple keys and values
-    d['name']['jack'] -> OrderedDict([
-        ('uid', 1), ('name', 'jack'), ('ip', '192.1')])
-    d['name'] -> OrderedDict([
-        ('jack', OrderedDict([('uid', 1), ('name', 'jack'), ('ip', '192.1')])),
-        ('tony', OrderedDict([('uid', 2), ('name', 'tony'), ('ip', '192.2')]))])
+    The indices and items are ordered in the dictionary. Like a normal dict,
+    the first index (column) is the main "keys" for indexing, while the rest
+    index or indices are the "values"::
+
+        user['jack'] -> [1, '192.1']
 
 
-    * indexing via slice syntax and multiple indices:
+    More powerful functions are supported by MultiIndexDict via the advanced
+    indexing syntax:
 
-    d[1,:] -> '192.1' # d[key_in_first_index,:] -> value_in_last_index
-    d[:,'192.1'] -> 1 # d[:,key_in_last_index] -> value_in_first_index
-    d['uid',1,'name'] -> 'jack' # d[index,key_in_index,index2] -> value_in_index2
-    d['uid',1,['name','ip']] -> ['jack', '192.1'] # multiple keys and values
+        1. To use any index (column) as the "keys", and other one or more
+           indices as the "values", just specify the indices as follows::
+
+               user[index1:key, index2]
+               # e.g.:
+               user['name':'jack', 'uid'] -> 1
+
+           Here, index `index1` is used as the "keys", and `key` is an element
+           in `index1` to locate the row of record in the table. `index2` can
+           be one or more indices to get the value(s) from the row of record.
+
+        2. Index multiple items at the same time::
+
+               user['name':'jack', ['uid','ip']] -> [1, '192.1']
+               user['name':'jack', 1:] -> [1, '192.1']
+
+        3. Index via various shortcuts::
+
+               user['jack'] -> [1, '192.1']
+               user[:'192.1'] -> ['jack', 1]
+               user['jack', :] -> ['jack', 1, '192.1']
+
+        4. Use attribute syntax to access a key if it is a valid Python
+           identifier::
+
+               user.jack -> [1, '192.1']
 
 
-    * indexing via attribute chain (index, key_in_index, index2):
+    A MultiIndexDict with 2 indices is fully compatible with the normal dict
+    or OrderedDict::
 
-    d.uid[1].ip -> '192.1'
-    d.ip['192.1'].uid -> 1
-    d.name['jack'].ip -> '192.1'
-    d.name.jack.ip -> '192.1' # access key 'jack' as attribute
-    d.name.jack['uid', 'ip'] -> [1, '192.1']
-    d.name.jack -> OrderedDict([('uid', 1), ('name', 'jack'), ('ip', '192.1')])
-    d.name -> OrderedDict([
-        ('jack', OrderedDict([('uid', 1), ('name', 'jack'), ('ip', '192.1')])),
-        ('tony', OrderedDict([('uid', 2), ('name', 'tony'), ('ip', '192.2')]))])
+        normal_dict = {'jack':1, 'tony':2}
+        user_dict = MultiIndexDict(normal_dict, ['name', 'uid'])
+
+        user_dict -> MultiIndexDict([['tony', 2], ['jack', 1]], ['name', 'uid'])
+        user_dict == normal_dict -> True
+
+    With the advanced indexing syntax, it can be used as a convenient
+    **bidirectional dict**::
+
+        user_dict['jack'] -> 1 # forward indexing
+        user_dict[:1] -> 'jack' # backward indexing
+
+
+    More examples of advanced indexing:
+
+    * Example of two indices (compatible with normal dict)::
+
+        color = MultiIndexDict([['red', '#FF0000'], ['green', '#00FF00']],
+                               ['name', 'hex'])
+
+        # flexible indexing of short and long versions:
+
+        color.red # -> '#FF0000'
+        <==> color['red']
+        <==> color['name':'red']
+        <==> color[0:'red'] <==> color[-2:'red']
+        <==> color['name':'red', 'hex']
+        <==> color[0:'red', 'hex'] <==> color[-2:'red', 1]
+
+        color[:'#FF0000'] # -> 'red'
+        <==> color['hex':'#FF0000']
+        <==> color[1:'#FF0000'] <==> color[-1:'#FF0000']
+        <==> color['hex':'#FF0000', 'name'] <==> color[1:'#FF0000', 0]
+
+
+        # setting item using different indices/keys:
+
+        color.blue = '#0000FF'
+        <==> color['blue'] = '#0000FF'
+        <==> color['name':'blue'] = '#0000FF'
+        <==> color['name':'blue', 'hex'] = '#0000FF'
+        <==> color[0:'blue', 1] = '#0000FF'
+
+        <==> color[:'#0000FF'] = 'blue'
+        <==> color[-1:'#0000FF'] = 'blue'
+        <==> color['hex':'#0000FF'] = 'blue'
+        <==> color['hex':'#0000FF', 'name'] = 'blue'
+        <==> color[1:'#0000FF', 0] = 'blue'
+
+        # result:
+        # color -> MultiIndexDict([['red', '#FF0000'],
+                                   ['green', '#00FF00'],
+                                   ['blue', '#0000FF']],
+                                  ['name', 'hex'])
+
+
+    * Example of three indices::
+
+        user = MultiIndexDict([[1, 'jack', '192.1'],
+                               [2, 'tony', '192.2']],
+                              ['uid', 'name', 'ip'])
+
+        user[1]                     -> 'jack'
+        user['name':'jack']         -> '192.1'
+        user['uid':1, 'ip']         -> '192.1'
+        user[1, ['name','ip']]      -> ['jack', '192.1']
+        user[1, ['name',-1]]        -> ['jack', '192.1']
+        user[1, [1,1,0,0,2,2]]      -> ['jack', 'jack', 1, 1, '192.1', '192.1']
+        user[1, :]                  -> [1, 'jack', '192.1']
+        user[1, 'name':]            -> ['jack', '192.1']
+        user[1, 0:-1]               -> [1, 'jack']
+        user[1, 'name':-1]          -> ['jack']
+        user['uid':1, 'name','ip']  -> ['jack', '192.1']
+        user[0:3, ['name','ip']] = ['tom', '192.3']
+        # result:
+        # user -> MultiIndexDict([[1, 'jack', '192.1'],
+                                  [2, 'tony', '192.2'],
+                                  [3, 'tom', '192.3']],
+                                 ['uid', 'name', 'ip'])
+
+
+    * Internal data structure `d.indices`: 3 levels of ordered dicts::
+
+        color.indices ->
+
+        IdxOrdDict([('name',
+                     AttrOrdDict([('red',
+                                   IdxOrdDict([('name', 'red'), ('hex', '#FF0000')])),
+                                  ('green',
+                                   IdxOrdDict([('name', 'green'),
+                                               ('hex', '#00FF00')]))])),
+                    ('hex',
+                     AttrOrdDict([('#FF0000',
+                                   IdxOrdDict([('name', 'red'), ('hex', '#FF0000')])),
+                                  ('#00FF00',
+                                   IdxOrdDict([('name', 'green'),
+                                               ('hex', '#00FF00')]))]))])
+
+
+
+        color.indices.name.red.hex # -> '#FF0000'
+        <==> color.indices['name']['red']['hex']
+
 
     '''
+
     def __init__(self, *args, **kw):
-#    def __init__(self, items=None, names=None):
         '''
-        (items, **kw)
-        (dict, **kw)
-        (MultiIndexDict, **kw)
+        Init dict with items and indices names:
 
-        (items, names, **kw)
-        (dict, names, **kw)
-        (MultiIndexDict, names **kw)
+            (items, names, **kw)
+            (dict, names, **kw)
+            (MultiIndexDict, names, **kw)
 
+        `names` and `kw` are optional.
 
-        init the dict with talbe-like data using flexible arguments.
+        `names` must all be str or unicode type.
+        When `names` not present, index names default to: 'index_0', 'index_1', etc.
+        When keyword arguments present, only two indices allowed (like a normal dict)
+
 
         Example:
 
-        +---------+---------+---------+
-        |   uid   |  name   |   ip    |
-        +=========+=========+=========+
-        |    1    |  jack   |  192.1  |
-        +---------+---------+---------+
-        |    2    |  tony   |  192.2  |
-        +---------+---------+---------+
-
-        header_names = ['uid', 'name', 'ip']
-        rows_of_data = [[1, 'jack', '192.1'],
-                        [2, 'tony', '192.2']]
-
-        data_with_header = [['uid', 'name', 'ip'],
-                            [1, 'jack', '192.1'],
+            indices_names = ['uid', 'name', 'ip']
+            rows_of_data = [[1, 'jack', '192.1'],
                             [2, 'tony', '192.2']]
 
-        table_columns = [['uid', 1, 2],
-                         ['name', 'jack', 'tony'],
-                         ['ip', '192.1', '192.2']]
+            user = MultiIndexDict(rows_of_data, indices_names)
 
-        # data_with_header == zip(*table_columns)
-
-        # the following constructions have the same effect:
-
-        d = MultiIndexDict(header_names, rows_of_data)
-
-        d = MultiIndexDict(data_with_header)
-
-        d = MultiIndexDict(indices=data_with_header)
-
-        d = MultiIndexDict(items=data_with_header)
-
-        d = MultiIndexDict(zip(*table_columns))
+            user = MultiIndexDict(rows_of_data)
+            <==> user = MultiIndexDict(rows_of_data, ['index_0', 'index_1', 'index_2'])
 
 
-        # Construct from normal dict:
+        Construct from normal dict:
 
-        normal_dict = {'jack':1, 'tony':2}
-        mid = MultiIndexDict(['name', 'uid'], normal_dict.items())
-
-
-
-        (a=1,b=2)
-        ([[a,1], [b,2]])
+            normal_dict = {'jack':1, 'tony':2}
+            user = MultiIndexDict(normal_dict.items(), ['name', 'uid'])
+            # user -> MultiIndexDict([['tony', 2], ['jack', 1]], ['name', 'uid'])
 
         '''
         # MultiIndexDict.__mro__:
@@ -672,15 +785,7 @@ class MultiIndexDict(AttrOrdDict):
 
     def __getitem__(self, args):
         '''
-        get values via slice syntax and multiple indices:
-
-            d[key_in_first_index] -> value_in_last_index
-            d[:key_in_last_index] -> value_in_first_index
-            d[index:key_in_index,index2] -> value_in_index2
-
-        index2 can be:
-            key, key index, tuple/list/slice of keys or key indices
-
+        get values via multi-indexing
         '''
 
         return mid_parse_args(self, args)[-1]
@@ -688,9 +793,25 @@ class MultiIndexDict(AttrOrdDict):
 
     def __setitem__(self, args, value):
         '''
-        set values via slice syntax and multiple indices
+        set values via multi-indexing
 
-        int/slice syntax can only change value of existing key, not creating new keys
+        int/slice syntax can only change values of existing keys, not creating new keys
+
+        If `d.indices` is empty (i.e., no indices names are set), indices names
+        can be created when setting a new item:
+
+            d = MultiIndexDict()
+            d['uid':1, 'name'] = 'jack'
+            # d -> MultiIndexDict([[1, 'jack']], ['uid', 'name'])
+
+        If `d.indices` is not empty, when setting a new item, all indices and values
+        must be specified:
+
+            d = MultiIndexDict([['jack', 1, '192.1']], ['name', 'uid', 'ip'])
+            d['tony', 1:] = [2, '192.2']
+            # this will not work:
+            d['tony'] =
+
         '''
         empty = len(self.indices) == 0
         if empty:
@@ -742,7 +863,7 @@ class MultiIndexDict(AttrOrdDict):
 
     def __delitem__(self, args):
         '''
-        delete keys/values via slice syntax and multiple indices
+        delete keys/values via multi-indexing
         '''
         index1, key, index2, item_d, value = mid_parse_args(self, args, ingore_index2=True)
         for name, v in item_d.items():
@@ -755,7 +876,7 @@ class MultiIndexDict(AttrOrdDict):
 
 
     def __len__(self):
-        'number of the items in an index'
+        'Number of the items in an index'
         try:
             return len(self.indices.values()[0])
         except Exception:
@@ -775,8 +896,16 @@ class MultiIndexDict(AttrOrdDict):
 
         if isinstance(other, MultiIndexDict):
             return self.indices == other.indices
+        # other Mapping types
 
-        if len(self.indices) != 2 or len(self) != len(other):
+        if len(self) != len(other):
+            return False
+        # equal length
+
+        if len(self.indices) == 0: # empty indices names, empty items
+            return True
+
+        if len(self.indices) != 2:
             return False
 
         # ignore indices names
@@ -793,13 +922,13 @@ class MultiIndexDict(AttrOrdDict):
 
     def __lt__(self, other):
         '''
-        check if `self < other`
+        Check if `self < other`
 
-        if `other` is not a Mapping type, only compare the class name.
+        If `other` is not a Mapping type, return NotImplemented.
 
-        if `other` is a Mapping type, compare in the following order:
+        If `other` is a Mapping type, compare in the following order:
             * length of items
-            * length of indices (length of an individual item)
+            * length of indices
             * convert `self` to an OrderedDict or a dict (depends on the type of `other`)
               and compare it with `other`
             * indices names (only if `other` is a MultiIndexDict)
@@ -868,7 +997,7 @@ class MultiIndexDict(AttrOrdDict):
 
 
     def __repr__(self, _repr_running={}):
-        'MultiIndexDict(items, names)'
+        'repr as "MultiIndexDict(items, names)"'
         call_key = id(self), _get_ident()
         if call_key in _repr_running:
             return '<%s(...)>' % self.__class__.__name__
@@ -886,7 +1015,7 @@ class MultiIndexDict(AttrOrdDict):
 
 
 #    def __sizeof__(self):
-#        'not very accurate.. '
+#        'not accurate.. '
 #        try:
 #            from pympler.asizeof import asizeof as getsizeof
 #        except ImportError:
@@ -1110,6 +1239,7 @@ class MultiIndexDict(AttrOrdDict):
 
 
     ############################################
+    # additional methods to handle index
 
 
     def replace_index(self, *args):
@@ -1230,27 +1360,6 @@ class MultiIndexItemsView(ItemsView):
 
 
 
-
-
-
-############################################
-
-
-class G(object):
-    def __getattr__(self, args):
-        print 'G __getattr__', type(args), args
-
-    def __setattr__(self, args, value):
-        print 'G __setattr__', args, value
-
-    def __getitem__(self, args):
-        print 'G __getitem__', type(args), args
-
-    def __setitem__(self, args, value):
-        print 'G __setitem__', args, value
-
-#g = G()
-
 def test():
     m = IdxOrdDict(a=1,b=2)
     m['a'] = 10
@@ -1261,10 +1370,9 @@ def test():
 
 
 
-    d = MultiIndexDict(
-               [[1, 'jack', ('192.100', 81)],
-                [2, 'tony', ('192.100', 82)]],
-                ['uid', 'name', 'ip'])
+    d = MultiIndexDict([[1, 'jack', ('192.100', 81)],
+                        [2, 'tony', ('192.100', 82)]],
+                       ['uid', 'name', 'ip'])
 
     d
     d[1]
