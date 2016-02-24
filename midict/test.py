@@ -59,11 +59,31 @@ indices_names = sets(text(**kw), min_size=10, max_size=10).map(list)
 
 dict_methods = set(dir({})) & set(dir(MultiIndexDict()))
 
+
+def get_mid_n_index(n):
+    items = []
+    for i in range(n):
+        items.append(sets(immutable, min_size=n, max_size=n))
+    items = zip(*items)
+    names = sets(text(average_size=4), min_size=n, max_size=n).map(list)
+
+
+
 class TestMIDict(unittest.TestCase):
 
-    @given(d)
-    def test_compat_dict(d):
-        ''
+#    @given(d)
+#    def test_compat_dict(self, d):
+#        ''
+
+    def test_setitem(self):
+        d = MultiIndexDict([['jack', 1],
+                            ['tony', 2]],
+                           ['name', 'uid'])
+        d['jack'] = 10 # -> MultiIndexDict([['jack', 10], ['tony', 2]], ['name', 'uid'])
+        d['alice'] = 2 # -> ValueError
+        d['jack'] = 2 # -> ValueError
+        d[:2] = 'jack'
+        d['name':'jack', :] = ['tony', 22]
 
 #    @given(items_all, indices_names, integers(1,10))
 #    def test_init(self, items_all, indices_names, n_idx):

@@ -4,7 +4,8 @@ MultiIndexDict (midict)
 
 A dictionary that has multiple indices and can index multiple items.
 
-
+Multi-indices
+-------------
 
 Consider a table-like data set (e.g., a user table):
 
@@ -18,67 +19,267 @@ Consider a table-like data set (e.g., a user table):
 
 In each column, elements are unique and hashable (suitable for dict keys).
 
-A multi-index `user` dictionary can be constructed like this::
+A multi-index ``user`` dictionary can be constructed with two arguments:
+a list of items (rows of data), and a list of index names::
 
     user = MultiIndexDict([['jack', 1, '192.1'],
                            ['tony', 2, '192.2']],
                           ['name', 'uid', 'ip'])
 
-The indices and items are ordered in the dictionary. Like a normal dict,
-the first index (column) is the main "keys" for indexing, while the rest
-index or indices are the "values"::
+Index names are for humans and indexing, and thus must be ``str`` or ``unicode``.
+The indices and items are ordered in the dictionary. Compatible with a
+normal dict, the first index (column) is the primary index to lookup/index
+a key, while the rest index or indices contain the corresponding key's
+value or list of values::
 
     user['jack'] -> [1, '192.1']
 
 
-More powerful functions are supported by MultiIndexDict via the advanced
-indexing syntax:
+To use any index (column) as the "keys", and other one or more
+indices as the "values", just specify the indices via the advanced
+indexing syntax ``d[index1:key, index2]``, e.g.::
 
-1. To use any index (column) as the "keys", and other one or more
-   indices as the "values", just specify the indices as follows::
+    user['name':'jack', 'uid'] -> 1
+    user['ip':'192.1', 'name'] -> 'jack'
 
-       user[index1:key, index2]
-       # e.g.:
-       user['name':'jack', 'uid'] -> 1
+Here, ``index1`` is the single index used as the "keys", and ``key`` is
+an element in ``index1`` to locate the row of record in the table.
+``index2`` can be one or more indices to specify the value(s) from the row
+of record.
 
-   Here, index `index1` is used as the "keys", and `key` is an element
-   in `index1` to locate the row of record in the table. `index2` can
-   be one or more indices to get the value(s) from the row of record.
 
-2. Index multiple items at the same time::
+Indexing multi-items
+--------------------
 
-       user['name':'jack', ['uid','ip']] -> [1, '192.1']
-       user['name':'jack', 1:] -> [1, '192.1']
+For a multi-column data set, it's useful to be able to access multiple
+columns/indices at the same time.
 
-3. Index via various shortcuts::
+In the advanced indexing syntax ``d[index1:key, index2]``,
+both ``index1`` and ``index2`` support flexible indexing using an int,
+tuple, list or slice object, which means (see ``IndexDict`` for more details)::
 
-       user['jack'] -> [1, '192.1']
-       user[:'192.1'] -> ['jack', 1]
-       user['jack', :] -> ['jack', 1, '192.1']
+    int -> the index of a key in d.keys()
+    tuple/list -> multiple keys or indices of keys or mixture
+    slice(key_start, key_stop, step) -> a range of keys
+    # key_start and key_stop can be a key or index of a key
 
-4. Use attribute syntax to access a key if it is a valid Python
-   identifier::
+Using the above ``user`` example::
 
-       user.jack -> [1, '192.1']
+    user['name':'jack', ['uid','ip']] -> [1, '192.1']
+    <==> user['name':'jack', [1,2]]
+    <==> user['name':'jack', 'uid':]
+    <==> user[0:'jack', 1:]
 
+
+Convenient indexing shortcuts
+-----------------------------
+
+Full syntax: ``d[index1:key, index2]``
+
+Short syntax::
+
+    d[key] <==> d[first_index:key, all_indice_except_first_index]
+    d[:key] <==> d[None:key] <==> d[last_index:key, all_indice_except_last_index]
+    d[key, index2] <==> d[first_index:key, index2] # only when ``index2`` is a list or slice object
+    d[index1:key, index2_1, index2_2, ...] <==> d[index1:key, (index2_1, index2_2, ...)]
+
+Examples::
+
+    user['jack'] -> [1, '192.1']
+    user[:'192.1'] -> ['jack', 1]
+    user['jack', :] -> ['jack', 1, '192.1']
+
+
+Compatible with normal dict
+---------------------------
 
 A MultiIndexDict with 2 indices is fully compatible with the normal dict
-or OrderedDict::
+or OrderedDict, and can be used as a drop-in replacement of the latter::
 
-    normal_dict = {'jack':1, 'tony':2}
-    user_dict = MultiIndexDict(normal_dict, ['name', 'uid'])
+    normal_dict = dict(jack=1, tony=2)
+    mi_dict = MultiIndexDict(jack=1, tony=2)
+    <==> mi_dict = MultiIndexDict(normal_dict)
 
-    user_dict -> MultiIndexDict([['tony', 2], ['jack', 1]], ['name', 'uid'])
-    user_dict == normal_dict -> True
+    normal_dict -> {'tony': 2, 'jack': 1}
+    mi_dict -> MultiIndexDict([['tony', 2], ['jack', 1]], ['index_0', 'index_1'])
 
-With the advanced indexing syntax, it can be used as a convenient
-**bidirectional dict**::
+    # the following equality checks all return True:
 
-    user_dict['jack'] -> 1 # forward indexing
-    user_dict[:1] -> 'jack' # backward indexing
+    mi_dict == normal_dict
+    normal_dict['jack'] == mi_dict['jack'] == 1
+    normal_dict.keys() == mi_dict.keys() == ['tony', 'jack']
+    normal_dict.values() == mi_dict.values() == [2, 1]
 
 
-More examples of advanced indexing:
+Bidirectional dict
+------------------
+
+With the advanced indexing syntax, a MultiIndexDict with 2 indices
+can be used as a normal dict, as well as a convenient
+**bidirectional dict** to index using either a key or a value::
+
+    mi_dict = MultiIndexDict(jack=1, tony=2)
+
+* Forward indexing (``d[key] -> value``, like a normal dict)::
+
+      mi_dict['jack'] -> 1
+      <==> mi_dict[0:'jack', 1]
+
+* Backward indexing (``d[:value] -> key``)::
+
+      mi_dict[:1] -> 'jack'
+      <==> mi_dict[-1:1, 0]
+
+
+Attributes as keys
+------------------
+
+Use the attribute syntax to access a key in MultiIndexDict if it is a valid
+Python identifier (``d.key`` <==> d['key'])::
+
+    mi_dict.jack <==> mi_dict['jack']
+
+This feature is supported by ``AttrDict``.
+
+Note that it treats an attribute as a dictionary key only when it can not
+find a normal attribute with that name. Thus, it is the programmer's
+responsibility to choose the correct syntax while writing the code.
+
+
+Extended methods for multi-indices
+----------------------------------
+
+A series of methods are extended to accept an optional agrument to specify
+which index/indices to use, including ``keys()``, ``values()``, ``items()``,
+``iterkeys()``, ``itervalues()``, ``iteritems()``, ``viewkeys()``, ``viewvalues()``,
+``viewitems()``, ``__iter__()`` and ``__reversed__()``::
+
+    user = MultiIndexDict([['jack', 1, '192.1'],
+                           ['tony', 2, '192.2']],
+                          ['name', 'uid', 'ip'])
+
+    user.keys() <==> user.keys(0) <==> user.keys('name') -> ['jack', 'tony']
+    user.keys('uid') <==> user.keys(1) -> [1, 2]
+
+    user.values() <==> user.values(['uid', 'ip']) -> [[1, '192.1'], [2, '192.2']]
+    user.values('uid') -> [1, 2]
+    user.values(['name','ip']) -> [['jack', '192.1'], ['tony', '192.2']]
+
+    user.items() <==> user.values(['name', 'uid', 'ip'])
+                        -> [['jack', 1, '192.1'], ['tony', 2, '192.2']]
+    user.items(['name','ip']) -> [['jack', '192.1'], ['tony', '192.2']]
+
+
+Additional APIs to handle indices
+---------------------------------
+MultiIndexDict provides handy APIs (``d.reorder_indices()``, ``d.rename_index()``,
+``d.add_index()``, ``d.remove_index()``) to handle the indices::
+
+    d = MultiIndexDict([['jack', 1],
+                        ['tony', 2]],
+                       ['name', 'uid'])
+
+    d.reorder_indices(['uid', 'name'])
+    d -> MultiIndexDict([[1, 'jack'], [2, 'tony']], ['uid', 'name'])
+
+    d.reorder_indices(['name', 'uid']) # change back indices
+
+    d.rename_index('uid', 'userid') # rename one index
+    <==> d.rename_index(['name', 'userid']) # rename all indices
+    d -> MultiIndexDict([['jack', 1], ['tony', 2]], ['name', 'userid'])
+
+    d.add_index(items=['192.1', '192.2'], name='ip')
+    d -> MultiIndexDict([['jack', 1, '192.1'], ['tony', 2, '192.2']],
+                        ['name', 'userid', 'ip'])
+
+    d.remove_index('userid')
+    d -> MultiIndexDict([['jack', '192.1'], ['tony', '192.2']], ['name', 'ip'])
+    d.remove_index(['name', 'ip']) # remove multiple indices
+    d -> MultiIndexDict() # empty
+
+
+Duplicate keys/values handling
+------------------------------
+
+The elements in each index of MultiIndexDict should be unique.
+
+When setting an item using syntax ``d[index1:key, index2] = value2``,
+if ``key`` already exists in ``index1``, the item of ``key`` will be updated
+according to ``index2`` and ``value2``. However, if any value of ``value2``
+already exists in ``index2``, a ``ValueExistsError`` will be raised.
+
+When constructing a MultiIndexDict or updating it with ``d.update()``,
+duplicate keys/values are handled in the same way as above with
+the first index treated as ``index1`` and the rest indices treated as ``index2``::
+
+    d = MultiIndexDict(jack=1, tony=2)
+
+    d['jack'] = 10 # replace value of key 'jack'
+    d['tom'] = 3 # add new key/value
+    d['jack'] = 2 # raise ValueExistsError
+    d['alice'] = 2 # raise ValueExistsError
+    d[:2] = 'jack' # raise ValueExistsError
+    d['jack', :] = ['tony', 22] # raise ValueExistsError
+    d['jack', :] = ['jack2', 11] # replace item of key 'jack'
+
+    d.update([['alice', 2]]) # raise ValueExistsError
+    d.update(alice=2) # raise ValueExistsError
+
+    MultiIndexDict([['jack',1]], jack=2) # {'jack': 2}
+    MultiIndexDict([['jack',1], ['jack',2]]) # {'jack': 2}
+    MultiIndexDict([['jack',1], ['tony',1]]) # raise ValueExistsError
+    MultiIndexDict([['jack',1]], tony=1) # raise ValueExistsError
+
+
+Internal data struture
+----------------------
+
+Internally MultiIndexDict uses a 3-level ordered dicts ``d.indices`` to store
+the items and indices and keep the order of them::
+
+    d = MultiIndexDict([['jack', 1],
+                        ['tony', 2]],
+                       ['name', 'uid'])
+
+    d.indices ->
+
+    IdxOrdDict([
+        ('name', AttrOrdDict([
+            ('jack', IdxOrdDict([('name', 'jack'), ('uid', 1)])),
+            ('tony', IdxOrdDict([('name', 'tony'), ('uid', 2)])),
+        ])),
+        ('uid', AttrOrdDict([
+            (1, IdxOrdDict([('name', 'jack'), ('uid', 1)])),
+            (2, IdxOrdDict([('name', 'tony'), ('uid', 2)])),
+        ])),
+    ])
+
+``d.indices`` also presents an interface to access the indices and items::
+
+    'name' in d.indices -> True
+    list(d.indices) -> ['name', 'uid']
+    d.indices.keys() -> ['name', 'uid']
+
+
+    'jack' in d.indices['name'] -> True
+    list(d.indices['name']) -> ['jack', 'tony']
+    d.indices['name'].keys() -> ['jack', 'tony']
+
+    d.indices['name'].values() -> [
+        IdxOrdDict([('name', 'jack'), ('uid', 1)]),
+        IdxOrdDict([('name', 'tony'), ('uid', 2)]),
+    ]
+
+    d.indices.name.jack.uid # -> 1
+    <==> d.indices['name']['jack']['uid']
+
+However, users should not directly change the keys/values in ``d.indices``,
+otherwise the structure or the references may be broken.
+Use the methods of ``d`` rather than ``d.indices`` to operate the data.
+
+
+More examples of advanced indexing
+----------------------------------
 
 * Example of two indices (compatible with normal dict)::
 
@@ -100,7 +301,7 @@ More examples of advanced indexing:
     <==> color['hex':'#FF0000', 'name'] <==> color[1:'#FF0000', 0]
 
 
-    # setting item using different indices/keys:
+    # setting an item using different indices/keys:
 
     color.blue = '#0000FF'
     <==> color['blue'] = '#0000FF'
@@ -127,18 +328,19 @@ More examples of advanced indexing:
                            [2, 'tony', '192.2']],
                           ['uid', 'name', 'ip'])
 
-    user[1]                     -> 'jack'
-    user['name':'jack']         -> '192.1'
+    user[1]                     -> ['jack', '192.1']
+    user['name':'jack']         -> [1, '192.1']
     user['uid':1, 'ip']         -> '192.1'
     user[1, ['name','ip']]      -> ['jack', '192.1']
     user[1, ['name',-1]]        -> ['jack', '192.1']
     user[1, [1,1,0,0,2,2]]      -> ['jack', 'jack', 1, 1, '192.1', '192.1']
     user[1, :]                  -> [1, 'jack', '192.1']
+    user[1, ::2]                -> [1, '192.1']
     user[1, 'name':]            -> ['jack', '192.1']
     user[1, 0:-1]               -> [1, 'jack']
     user[1, 'name':-1]          -> ['jack']
     user['uid':1, 'name','ip']  -> ['jack', '192.1']
-    user[0:3, ['name','ip']] = ['tom', '192.3']
+    user[0:3, ['name','ip']] = ['tom', '192.3'] # set a new item
     # result:
     # user -> MultiIndexDict([[1, 'jack', '192.1'],
                               [2, 'tony', '192.2'],
@@ -146,29 +348,20 @@ More examples of advanced indexing:
                              ['uid', 'name', 'ip'])
 
 
-* Internal data structure `d.indices`: 3 levels of ordered dicts::
+---------
 
-    color.indices ->
 
-    IdxOrdDict([('name',
-                 AttrOrdDict([('red',
-                               IdxOrdDict([('name', 'red'), ('hex', '#FF0000')])),
-                              ('green',
-                               IdxOrdDict([('name', 'green'),
-                                           ('hex', '#00FF00')]))])),
-                ('hex',
-                 AttrOrdDict([('#FF0000',
-                               IdxOrdDict([('name', 'red'), ('hex', '#FF0000')])),
-                              ('#00FF00',
-                               IdxOrdDict([('name', 'green'),
-                                           ('hex', '#00FF00')]))]))])
+More docs are within the code. Go ahead the check it!
 
 
 
-    color.indices.name.red.hex # -> '#FF0000'
-    <==> color.indices['name']['red']['hex']
+TODO
+---------
 
+check pandas.Index and other similar solutions
 
+implement using namedtuple and other types
 
+frosen/readonly version
 
-More docs are inside the code. Go ahead the check it!
+more tests

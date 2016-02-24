@@ -11,7 +11,7 @@ from types import NoneType
 
 def od_replace_key(od, key, new_key, *args, **kw):
     '''
-    Replace key(s) in OrderedDict `od` by new key(s) in-place (i.e.,
+    Replace key(s) in OrderedDict ``od`` by new key(s) in-place (i.e.,
     preserving the order(s) of the key(s))
 
     Optional new value(s) for new key(s) can be provided as a positional
@@ -19,8 +19,8 @@ def od_replace_key(od, key, new_key, *args, **kw):
 
         od_replace_key(od, key, new_key, new_value)
 
-    To replace multiple keys, pass argument `key` as a list instance,
-    or explicitly pass a keyword argument `multi=True`:
+    To replace multiple keys, pass argument ``key`` as a list instance,
+    or explicitly pass a keyword argument ``multi=True``:
 
         od_replace_key(od, keys, new_keys, [new_values,] multi=True)
 
@@ -60,18 +60,41 @@ def od_replace_key(od, key, new_key, *args, **kw):
     dict.__setitem__(od, new_key, value)
 
 
+def od_reorder_keys(od, keys_in_new_order):
+    '''
+    Reorder the keys in an OrderedDict ``od`` in-place.
+    '''
+    if set(od.keys()) != set(keys_in_new_order):
+        raise KeyError('Keys in the new order do not match existing keys')
+    for key in keys_in_new_order:
+        od[key] = od.pop(key)
+    return od
 
 
 class AttrDict(dict):
     '''
-    dict that can get/set/delete items through attributes (eg, `d.key`)
+    A dictionary that can get/set/delete a key using the attribute syntax
+    if it is a valid Python identifier. (``d.key`` <==> d['key'])
+
+    Note that it treats an attribute as a dictionary key only when it can not
+    find a normal attribute with that name. Thus, it is the programmer's
+    responsibility to choose the correct syntax while writing the code.
+
+    Be aware that besides all the inherited attributes, AttrDict has an
+    additional internal attribute "_AttrDict__attr2item".
+
+    Example:
+
+        d = AttrDict(__init__='value for key "__init__"')
+        d.__init__ -> <bound method AttrDict.__init__>
+        d["__init__"] -> 'value for key "__init__"'
     '''
 
     def __init__(self, *args, **kw):
-
-        # set any attributes here (or in subclass) - before __init__()
-        # these remain as normal attributes
-
+        '''
+        set any attributes here (or in subclass) - before __init__()
+        so that these remain as normal attributes
+        '''
         super(AttrDict, self).__init__(*args, **kw)
         self.__attr2item = True # transfered to _AttrDict__attr2item
 
@@ -121,18 +144,24 @@ class AttrDict(dict):
             self.__delitem__(item)
 
 
-def _index2key(keys, index):
-    'Convert int `index` to the corresponding key in `keys`'
-    try:
-        return keys[index]
-    except IndexError:
-        raise KeyError('Index out of range of keys: %s' % (index,))
+
+
+def _index_to_key(keys, index):
+    'Convert int ``index`` to the corresponding key in ``keys``'
+    if isinstance(index, int):
+        try:
+            return keys[index]
+        except IndexError:
+            # use KeyError rather than IndexError for compatibility
+#            IndexNotExistsError()
+            raise KeyError('Index out of range of keys: %s' % (index,))
+    return index
 
 
 def convert_index_keys(d, item):
     # use a separate function rather than a method inside the class IndexDict
     '''
-    Convert `item` in various types to a single key or a list of keys.
+    Convert ``item`` in various types to a single key or a list of keys.
     '''
 
     keys = d.keys()
@@ -140,14 +169,13 @@ def convert_index_keys(d, item):
 
     # int item will be interpreted as the index rather than key!!
     if isinstance(item, int):
-        item = _index2key(keys, item)
+        item = _index_to_key(keys, item)
         single = True
 
     elif isinstance(item, (tuple, list)):
         item2 = []
         for i in item:
-            if isinstance(i, int):
-                i = _index2key(keys, i)
+            i = _index_to_key(keys, i)
             item2.append(i)
         item = item2
         single = False
@@ -176,7 +204,7 @@ def convert_index_keys(d, item):
 
 
 def _check_IndexDict_key(key):
-    'raise TypeError if `key` is int, tuple or NoneType'
+    'raise TypeError if ``key`` is int, tuple or NoneType'
     if isinstance(key, (int, tuple, NoneType)):
         raise TypeError('Key must not be int or tuple or None: %s' % (key,))
 
@@ -184,16 +212,16 @@ def _check_IndexDict_key(key):
 class IndexDict(dict):
     '''
     A dictionary that supports flexible indexing (get/set/delete) of
-    multiple keys via a int, tuple, list or slice object.
+    multiple keys via an int, tuple, list or slice object.
 
     The type of a valid key in IndexDict should not be int, tuple, or NoneType.
 
-    To index one or more items, use a proper `item` argument with the
-    bracket syntax: `d[item]`. The possible types and contents of `item`
+    To index one or more items, use a proper ``item`` argument with the
+    bracket syntax: ``d[item]``. The possible types and contents of ``item``
     as well as the corresponding values are summarized as follows:
 
     ============= ================================== ======================
-        type        content of the `item` argument    corresponding values
+        type        content of the ``item`` argument    corresponding values
     ============= ================================== ======================
     int           the index of a key in d.keys()     the value of the key
     tuple/list    multiple keys or indices of keys   list of values
@@ -204,7 +232,7 @@ class IndexDict(dict):
     The tuple/list syntax can mix keys with indices of keys.
 
     The slice syntax means a range of keys (like the normal list slicing),
-    and the `key_start` and `key_stop` parameter can be a key, the index
+    and the ``key_start`` and ``key_stop`` parameter can be a key, the index
     of a key, or None (which can be omitted).
 
     When setting items, the slice and int syntax (including int in the tuple/list
@@ -301,6 +329,7 @@ class IdxOrdDict(IndexDict, AttrDict, OrderedDict):
     pass
 
 
+
 def _check_index_name(name):
     'Check if index name is valid'
     if not isinstance(name, (str,unicode)):
@@ -312,7 +341,7 @@ def _get_unique_name(name, collection):
     '''
     Generate a unique name by appending a sequence number to
     the original name so that it is not contained in the collection.
-    `collection` has a __contains__ method (tuple, list, dict, etc.)
+    ``collection`` has a __contains__ method (tuple, list, dict, etc.)
     '''
     if name not in collection:
         return name
@@ -339,15 +368,15 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
     '''
     Parse the arguments for indexing in MultiIndexDict.
 
-    Full syntax: `d[index1:key, index2]`.
+    Full syntax: ``d[index1:key, index2]``.
 
-    `index2` can be flexible indexing (int, list, slice etc.) as in IndexDict.
+    ``index2`` can be flexible indexing (int, list, slice etc.) as in ``IndexDict``.
 
     Short syntax:
 
-    * d[key] <==> d[key,] <==> d[first_index:key, rest_index]
-    * d[:key] <==> d[:key,] <==> d[None:key] <==> d[last_index:key, rest_index]
-    * d[key, index2]  <==> d[first_index:key, index2] # this is valid
+    * d[key] <==> d[key,] <==> d[first_index:key, all_indice_except_first]
+    * d[:key] <==> d[:key,] <==> d[None:key] <==> d[last_index:key, all_indice_except_last]
+    * d[key, index2] <==> d[first_index:key, index2] # this is valid
       # only when index2 is a list or slice object
     * d[index1:key, index2_1, index2_2, ...] <==> d[index1:key, (index2_1, index2_2, ...)]
 
@@ -398,6 +427,9 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
             if index1 is None:
                 index1_last = True
                 index1 = _default
+            elif isinstance(index1, int):
+                raise TypeError('Index1 can not be int when dictionary '
+                    'is empty: %s' % (index1,))
             else:
                 _check_index_name(index1)
                 names.append(index1)
@@ -405,9 +437,9 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
             if isinstance(index2, (tuple, list)):
                 map(_check_index_name, index2)
                 names.extend(index2)
-            elif isinstance(index2, slice):
-                raise TypeError('Can not use slice as #2 argument when '
-                    'dictionary is empty: %s' % index2)
+            elif isinstance(index2, (int,slice)):
+                raise TypeError('Index2 can not be int or slice when '
+                    'dictionary is empty: %s' % (index2,))
             else:
                 _check_index_name(index2)
                 names.append(index2)
@@ -437,23 +469,8 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
     elif index1 is None: # slice syntax d[:key]
         index1 = -1
 
-    if index2 is _default: # not specified
-        # index2 defaults to all indices except index1
-        if len(names) == 0:
-            raise KeyError('Index2 must be specified when only 1 index exists')
-
-        if isinstance(index1, int):
-            index1 = _index2key(names, index1)
-
-        index2 = [n for n in names if n != index1]
-        if len(index2) == 1: # single index
-            index2 = index2[0]
-#        index2 = (index1 + 1) % N
-
-#    if isinstance(index1, int):
-#        index1 = _index2key(names, index1)
-#    if isinstance(index2, int):
-#        index2 = _index2key(names, index2)
+    # index1 is always returned as a normal key, not int
+    index1 = _index_to_key(names, index1)
 
     try:
         index_d = self.indices[index1]
@@ -463,9 +480,28 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
     try:
         item_d = index_d[key]
     except KeyError:
-        if allow_new: # new key; item_d = None
-            return index1, key, index2, None, None
-        raise KeyError('Key not found in index "%s": %s' % (index1, key))
+        if allow_new: # new key for setitem; item_d = None
+            item_d = None
+        else:
+            raise KeyError('Key not found in index "%s": %s' % (index1, key))
+
+    if ingore_index2: # used by delitem
+        return item_d
+
+    if index2 is _default: # not specified
+        # index2 defaults to all indices except index1
+        if len(names) == 1:
+            index2 = 0 # index2 defaults to the only one index
+#            raise KeyError('Index2 must be specified when only 1 index exists')
+        else:
+            index2 = [n for n in names if n != index1]
+            if len(index2) == 1: # single index
+                index2 = index2[0]
+
+    index2 = _index_to_key(names, index2)
+
+    if item_d is None: # allow_new
+        return index1, key, index2, None, None
 
     try:
         value = item_d[index2]
@@ -552,8 +588,8 @@ def _mid_init(self, *args, **kw):
     items_d = OrderedDict()
     for item in items:
         if item:
-            main_key = item[0]
-            items_d[main_key] = item
+            primary_key = item[0]
+            items_d[primary_key] = item
     items = items_d.values()
 
     for item in items:
@@ -561,9 +597,8 @@ def _mid_init(self, *args, **kw):
 
         for i, (index, value) in enumerate(item_d.items()):
             index_d = d[index]
-            if value in index_d: # surely not in the main key/first index
-                raise ValueError('Partially duplicate items not allowed: %s and %s'
-                % (index_d[value].values(), item))
+            if value in index_d: # surely not in the primary key/first index
+                raise ValueExistsError(value, index)
             index_d[value] = item_d
 
 
@@ -571,6 +606,8 @@ class MultiIndexDict(AttrOrdDict):
     '''
     A dictionary that has multiple indices and can index multiple items.
 
+    Multi-indices
+    -------------
 
     Consider a table-like data set (e.g., a user table):
 
@@ -584,67 +621,267 @@ class MultiIndexDict(AttrOrdDict):
 
     In each column, elements are unique and hashable (suitable for dict keys).
 
-    A multi-index `user` dictionary can be constructed like this::
+    A multi-index ``user`` dictionary can be constructed with two arguments:
+    a list of items (rows of data), and a list of index names::
 
         user = MultiIndexDict([['jack', 1, '192.1'],
                                ['tony', 2, '192.2']],
                               ['name', 'uid', 'ip'])
 
-    The indices and items are ordered in the dictionary. Like a normal dict,
-    the first index (column) is the main "keys" for indexing, while the rest
-    index or indices are the "values"::
+    Index names are for humans and indexing, and thus must be ``str`` or ``unicode``.
+    The indices and items are ordered in the dictionary. Compatible with a
+    normal dict, the first index (column) is the primary index to lookup/index
+    a key, while the rest index or indices contain the corresponding key's
+    value or list of values::
 
         user['jack'] -> [1, '192.1']
 
 
-    More powerful functions are supported by MultiIndexDict via the advanced
-    indexing syntax:
+    To use any index (column) as the "keys", and other one or more
+    indices as the "values", just specify the indices via the advanced
+    indexing syntax ``d[index1:key, index2]``, e.g.::
 
-    1. To use any index (column) as the "keys", and other one or more
-       indices as the "values", just specify the indices as follows::
+        user['name':'jack', 'uid'] -> 1
+        user['ip':'192.1', 'name'] -> 'jack'
 
-           user[index1:key, index2]
-           # e.g.:
-           user['name':'jack', 'uid'] -> 1
+    Here, ``index1`` is the single index used as the "keys", and ``key`` is
+    an element in ``index1`` to locate the row of record in the table.
+    ``index2`` can be one or more indices to specify the value(s) from the row
+    of record.
 
-       Here, index `index1` is used as the "keys", and `key` is an element
-       in `index1` to locate the row of record in the table. `index2` can
-       be one or more indices to get the value(s) from the row of record.
 
-    2. Index multiple items at the same time::
+    Indexing multi-items
+    --------------------
 
-           user['name':'jack', ['uid','ip']] -> [1, '192.1']
-           user['name':'jack', 1:] -> [1, '192.1']
+    For a multi-column data set, it's useful to be able to access multiple
+    columns/indices at the same time.
 
-    3. Index via various shortcuts::
+    In the advanced indexing syntax ``d[index1:key, index2]``,
+    both ``index1`` and ``index2`` support flexible indexing using an int,
+    tuple, list or slice object, which means (see ``IndexDict`` for more details)::
 
-           user['jack'] -> [1, '192.1']
-           user[:'192.1'] -> ['jack', 1]
-           user['jack', :] -> ['jack', 1, '192.1']
+        int -> the index of a key in d.keys()
+        tuple/list -> multiple keys or indices of keys or mixture
+        slice(key_start, key_stop, step) -> a range of keys
+        # key_start and key_stop can be a key or index of a key
 
-    4. Use attribute syntax to access a key if it is a valid Python
-       identifier::
+    Using the above ``user`` example::
 
-           user.jack -> [1, '192.1']
+        user['name':'jack', ['uid','ip']] -> [1, '192.1']
+        <==> user['name':'jack', [1,2]]
+        <==> user['name':'jack', 'uid':]
+        <==> user[0:'jack', 1:]
 
+
+    Convenient indexing shortcuts
+    -----------------------------
+
+    Full syntax: ``d[index1:key, index2]``
+
+    Short syntax::
+
+        d[key] <==> d[first_index:key, all_indice_except_first_index]
+        d[:key] <==> d[None:key] <==> d[last_index:key, all_indice_except_last_index]
+        d[key, index2] <==> d[first_index:key, index2] # only when ``index2`` is a list or slice object
+        d[index1:key, index2_1, index2_2, ...] <==> d[index1:key, (index2_1, index2_2, ...)]
+
+    Examples::
+
+        user['jack'] -> [1, '192.1']
+        user[:'192.1'] -> ['jack', 1]
+        user['jack', :] -> ['jack', 1, '192.1']
+
+
+    Compatible with normal dict
+    ---------------------------
 
     A MultiIndexDict with 2 indices is fully compatible with the normal dict
-    or OrderedDict::
+    or OrderedDict, and can be used as a drop-in replacement of the latter::
 
-        normal_dict = {'jack':1, 'tony':2}
-        user_dict = MultiIndexDict(normal_dict, ['name', 'uid'])
+        normal_dict = dict(jack=1, tony=2)
+        mi_dict = MultiIndexDict(jack=1, tony=2)
+        <==> mi_dict = MultiIndexDict(normal_dict)
 
-        user_dict -> MultiIndexDict([['tony', 2], ['jack', 1]], ['name', 'uid'])
-        user_dict == normal_dict -> True
+        normal_dict -> {'tony': 2, 'jack': 1}
+        mi_dict -> MultiIndexDict([['tony', 2], ['jack', 1]], ['index_0', 'index_1'])
 
-    With the advanced indexing syntax, it can be used as a convenient
-    **bidirectional dict**::
+        # the following equality checks all return True:
 
-        user_dict['jack'] -> 1 # forward indexing
-        user_dict[:1] -> 'jack' # backward indexing
+        mi_dict == normal_dict
+        normal_dict['jack'] == mi_dict['jack'] == 1
+        normal_dict.keys() == mi_dict.keys() == ['tony', 'jack']
+        normal_dict.values() == mi_dict.values() == [2, 1]
 
 
-    More examples of advanced indexing:
+    Bidirectional dict
+    ------------------
+
+    With the advanced indexing syntax, a MultiIndexDict with 2 indices
+    can be used as a normal dict, as well as a convenient
+    **bidirectional dict** to index using either a key or a value::
+
+        mi_dict = MultiIndexDict(jack=1, tony=2)
+
+    * Forward indexing (``d[key] -> value``, like a normal dict)::
+
+          mi_dict['jack'] -> 1
+          <==> mi_dict[0:'jack', 1]
+
+    * Backward indexing (``d[:value] -> key``)::
+
+          mi_dict[:1] -> 'jack'
+          <==> mi_dict[-1:1, 0]
+
+
+    Attributes as keys
+    ------------------
+
+    Use the attribute syntax to access a key in MultiIndexDict if it is a valid
+    Python identifier (``d.key`` <==> d['key'])::
+
+        mi_dict.jack <==> mi_dict['jack']
+
+    This feature is supported by ``AttrDict``.
+
+    Note that it treats an attribute as a dictionary key only when it can not
+    find a normal attribute with that name. Thus, it is the programmer's
+    responsibility to choose the correct syntax while writing the code.
+
+
+    Extended methods for multi-indices
+    ----------------------------------
+
+    A series of methods are extended to accept an optional agrument to specify
+    which index/indices to use, including ``keys()``, ``values()``, ``items()``,
+    ``iterkeys()``, ``itervalues()``, ``iteritems()``, ``viewkeys()``, ``viewvalues()``,
+    ``viewitems()``, ``__iter__()`` and ``__reversed__()``::
+
+        user = MultiIndexDict([['jack', 1, '192.1'],
+                               ['tony', 2, '192.2']],
+                              ['name', 'uid', 'ip'])
+
+        user.keys() <==> user.keys(0) <==> user.keys('name') -> ['jack', 'tony']
+        user.keys('uid') <==> user.keys(1) -> [1, 2]
+
+        user.values() <==> user.values(['uid', 'ip']) -> [[1, '192.1'], [2, '192.2']]
+        user.values('uid') -> [1, 2]
+        user.values(['name','ip']) -> [['jack', '192.1'], ['tony', '192.2']]
+
+        user.items() <==> user.values(['name', 'uid', 'ip'])
+                            -> [['jack', 1, '192.1'], ['tony', 2, '192.2']]
+        user.items(['name','ip']) -> [['jack', '192.1'], ['tony', '192.2']]
+
+
+    Additional APIs to handle indices
+    ---------------------------------
+    MultiIndexDict provides handy APIs (``d.reorder_indices()``, ``d.rename_index()``,
+    ``d.add_index()``, ``d.remove_index()``) to handle the indices::
+
+        d = MultiIndexDict([['jack', 1],
+                            ['tony', 2]],
+                           ['name', 'uid'])
+
+        d.reorder_indices(['uid', 'name'])
+        d -> MultiIndexDict([[1, 'jack'], [2, 'tony']], ['uid', 'name'])
+
+        d.reorder_indices(['name', 'uid']) # change back indices
+
+        d.rename_index('uid', 'userid') # rename one index
+        <==> d.rename_index(['name', 'userid']) # rename all indices
+        d -> MultiIndexDict([['jack', 1], ['tony', 2]], ['name', 'userid'])
+
+        d.add_index(items=['192.1', '192.2'], name='ip')
+        d -> MultiIndexDict([['jack', 1, '192.1'], ['tony', 2, '192.2']],
+                            ['name', 'userid', 'ip'])
+
+        d.remove_index('userid')
+        d -> MultiIndexDict([['jack', '192.1'], ['tony', '192.2']], ['name', 'ip'])
+        d.remove_index(['name', 'ip']) # remove multiple indices
+        d -> MultiIndexDict() # empty
+
+
+    Duplicate keys/values handling
+    ------------------------------
+
+    The elements in each index of MultiIndexDict should be unique.
+
+    When setting an item using syntax ``d[index1:key, index2] = value2``,
+    if ``key`` already exists in ``index1``, the item of ``key`` will be updated
+    according to ``index2`` and ``value2``. However, if any value of ``value2``
+    already exists in ``index2``, a ``ValueExistsError`` will be raised.
+
+    When constructing a MultiIndexDict or updating it with ``d.update()``,
+    duplicate keys/values are handled in the same way as above with
+    the first index treated as ``index1`` and the rest indices treated as ``index2``::
+
+        d = MultiIndexDict(jack=1, tony=2)
+
+        d['jack'] = 10 # replace value of key 'jack'
+        d['tom'] = 3 # add new key/value
+        d['jack'] = 2 # raise ValueExistsError
+        d['alice'] = 2 # raise ValueExistsError
+        d[:2] = 'jack' # raise ValueExistsError
+        d['jack', :] = ['tony', 22] # raise ValueExistsError
+        d['jack', :] = ['jack2', 11] # replace item of key 'jack'
+
+        d.update([['alice', 2]]) # raise ValueExistsError
+        d.update(alice=2) # raise ValueExistsError
+
+        MultiIndexDict([['jack',1]], jack=2) # {'jack': 2}
+        MultiIndexDict([['jack',1], ['jack',2]]) # {'jack': 2}
+        MultiIndexDict([['jack',1], ['tony',1]]) # raise ValueExistsError
+        MultiIndexDict([['jack',1]], tony=1) # raise ValueExistsError
+
+
+    Internal data struture
+    ----------------------
+
+    Internally MultiIndexDict uses a 3-level ordered dicts ``d.indices`` to store
+    the items and indices and keep the order of them::
+
+        d = MultiIndexDict([['jack', 1],
+                            ['tony', 2]],
+                           ['name', 'uid'])
+
+        d.indices ->
+
+        IdxOrdDict([
+            ('name', AttrOrdDict([
+                ('jack', IdxOrdDict([('name', 'jack'), ('uid', 1)])),
+                ('tony', IdxOrdDict([('name', 'tony'), ('uid', 2)])),
+            ])),
+            ('uid', AttrOrdDict([
+                (1, IdxOrdDict([('name', 'jack'), ('uid', 1)])),
+                (2, IdxOrdDict([('name', 'tony'), ('uid', 2)])),
+            ])),
+        ])
+
+    ``d.indices`` also presents an interface to access the indices and items::
+
+        'name' in d.indices -> True
+        list(d.indices) -> ['name', 'uid']
+        d.indices.keys() -> ['name', 'uid']
+
+
+        'jack' in d.indices['name'] -> True
+        list(d.indices['name']) -> ['jack', 'tony']
+        d.indices['name'].keys() -> ['jack', 'tony']
+
+        d.indices['name'].values() -> [
+            IdxOrdDict([('name', 'jack'), ('uid', 1)]),
+            IdxOrdDict([('name', 'tony'), ('uid', 2)]),
+        ]
+
+        d.indices.name.jack.uid # -> 1
+        <==> d.indices['name']['jack']['uid']
+
+    However, users should not directly change the keys/values in ``d.indices``,
+    otherwise the structure or the references may be broken.
+    Use the methods of ``d`` rather than ``d.indices`` to operate the data.
+
+
+    More examples of advanced indexing
+    ----------------------------------
 
     * Example of two indices (compatible with normal dict)::
 
@@ -666,7 +903,7 @@ class MultiIndexDict(AttrOrdDict):
         <==> color['hex':'#FF0000', 'name'] <==> color[1:'#FF0000', 0]
 
 
-        # setting item using different indices/keys:
+        # setting an item using different indices/keys:
 
         color.blue = '#0000FF'
         <==> color['blue'] = '#0000FF'
@@ -693,75 +930,49 @@ class MultiIndexDict(AttrOrdDict):
                                [2, 'tony', '192.2']],
                               ['uid', 'name', 'ip'])
 
-        user[1]                     -> 'jack'
-        user['name':'jack']         -> '192.1'
+        user[1]                     -> ['jack', '192.1']
+        user['name':'jack']         -> [1, '192.1']
         user['uid':1, 'ip']         -> '192.1'
         user[1, ['name','ip']]      -> ['jack', '192.1']
         user[1, ['name',-1]]        -> ['jack', '192.1']
         user[1, [1,1,0,0,2,2]]      -> ['jack', 'jack', 1, 1, '192.1', '192.1']
         user[1, :]                  -> [1, 'jack', '192.1']
+        user[1, ::2]                -> [1, '192.1']
         user[1, 'name':]            -> ['jack', '192.1']
         user[1, 0:-1]               -> [1, 'jack']
         user[1, 'name':-1]          -> ['jack']
         user['uid':1, 'name','ip']  -> ['jack', '192.1']
-        user[0:3, ['name','ip']] = ['tom', '192.3']
+        user[0:3, ['name','ip']] = ['tom', '192.3'] # set a new item
         # result:
         # user -> MultiIndexDict([[1, 'jack', '192.1'],
                                   [2, 'tony', '192.2'],
                                   [3, 'tom', '192.3']],
                                  ['uid', 'name', 'ip'])
 
-
-    * Internal data structure `d.indices`: 3 levels of ordered dicts::
-
-        color.indices ->
-
-        IdxOrdDict([('name',
-                     AttrOrdDict([('red',
-                                   IdxOrdDict([('name', 'red'), ('hex', '#FF0000')])),
-                                  ('green',
-                                   IdxOrdDict([('name', 'green'),
-                                               ('hex', '#00FF00')]))])),
-                    ('hex',
-                     AttrOrdDict([('#FF0000',
-                                   IdxOrdDict([('name', 'red'), ('hex', '#FF0000')])),
-                                  ('#00FF00',
-                                   IdxOrdDict([('name', 'green'),
-                                               ('hex', '#00FF00')]))]))])
-
-
-
-        color.indices.name.red.hex # -> '#FF0000'
-        <==> color.indices['name']['red']['hex']
-
-
-
-
-
     '''
 
     def __init__(self, *args, **kw):
         '''
-        Init dict with items and indices names:
+        Init dictionary with items and index names:
 
             (items, names, **kw)
             (dict, names, **kw)
             (MultiIndexDict, names, **kw)
 
-        `names` and `kw` are optional.
+        ``names`` and ``kw`` are optional.
 
-        `names` must all be str or unicode type.
-        When `names` not present, index names default to: 'index_0', 'index_1', etc.
+        ``names`` must all be str or unicode type.
+        When ``names`` not present, index names default to: 'index_0', 'index_1', etc.
         When keyword arguments present, only two indices allowed (like a normal dict)
 
 
         Example:
 
-            indices_names = ['uid', 'name', 'ip']
+            index_names = ['uid', 'name', 'ip']
             rows_of_data = [[1, 'jack', '192.1'],
                             [2, 'tony', '192.2']]
 
-            user = MultiIndexDict(rows_of_data, indices_names)
+            user = MultiIndexDict(rows_of_data, index_names)
 
             user = MultiIndexDict(rows_of_data)
             <==> user = MultiIndexDict(rows_of_data, ['index_0', 'index_1', 'index_2'])
@@ -801,47 +1012,61 @@ class MultiIndexDict(AttrOrdDict):
 
         int/slice syntax can only change values of existing keys, not creating new keys
 
-        If `d.indices` is empty (i.e., no indices names are set), indices names
-        can be created when setting a new item:
+        If ``d.indices`` is empty (i.e., no index names are set), index names
+        can be created when setting a new item with specified names:
 
             d = MultiIndexDict()
             d['uid':1, 'name'] = 'jack'
             # d -> MultiIndexDict([[1, 'jack']], ['uid', 'name'])
 
-        If `d.indices` is not empty, when setting a new item, all indices and values
+        If ``d.indices`` is not empty, when setting a new item, all indices and values
         must be specified:
 
             d = MultiIndexDict([['jack', 1, '192.1']], ['name', 'uid', 'ip'])
-            d['tony', 1:] = [2, '192.2']
-            # this will not work:
-            d['tony'] =
+            d['tony'] = [2, '192.2']
+            <==> d['name':'tony',['uid', 'ip']] = [2, '192.2']
+            # the following will not work:
+            d['alice', ['uid']] = [3] # raise ValueError
+
+        More examles::
+
+            d = MultiIndexDict(jack=1, tony=2)
+
+            d['jack'] = 10 # replace value of key 'jack'
+            d['tom'] = 3 # add new key/value
+            d['jack'] = 2 # raise ValueExistsError
+            d['alice'] = 2 # raise ValueExistsError
+            d[:2] = 'jack' # raise ValueExistsError
+            d['jack', :] = ['tony', 22] # raise ValueExistsError
+            d['jack', :] = ['jack2', 11] # replace item of key 'jack'
 
         '''
-        empty = len(self.indices) == 0
+        indices = self.indices
+        empty = len(indices) == 0
         if empty:
             index1, key, index2, index1_last = mid_parse_args(self, args, allow_new=True)
-            names = [index1]
+            exist_names = [index1]
             item = [key]
             try:
                 _check_index_name(index2)
-                names.append(index2)
+                exist_names.append(index2)
                 item.append(value)
             except TypeError:
                 Nvalue, value = _get_value_len(value)
                 if len(index2) != Nvalue:
                     raise ValueError('Number of keys (%s) based on argument %s does not match '
                         'number of values (%s)' % (len(index2), index2, Nvalue))
-                names.extend(index2)
+                exist_names.extend(index2)
                 item.extend(value)
             if index1_last:
-                names = names[1:] + names[:1]
+                exist_names = exist_names[1:] + exist_names[:1]
                 item = item[1:] + item[:1]
 
-            _mid_init(self, [item], names)
+            _mid_init(self, [item], exist_names)
             return
 
         index1, key, index2, item_d, old_value = mid_parse_args(self, args, allow_new=True)
-        index2_list, single = convert_index_keys(self.indices, index2)
+        index2_list, single = convert_index_keys(indices, index2)
         if single:
             index2_list = [index2_list]
             value = [value]
@@ -851,25 +1076,41 @@ class MultiIndexDict(AttrOrdDict):
                 raise ValueError('Number of keys (%s) based on argument %s does not match '
                     'number of values (%s)' % (len(index2_list), index2, Nvalue))
 
+        # check duplicate values
+        for i, v in zip(index2_list, value):
+            # index2_list may contain index1; now allow duplicate value for index1 either
+            if v in indices[i]:
+                raise ValueExistsError(v, i)
+
         if item_d is None: # new key
-            self.indices[index1][key] = d =IdxOrdDict()
+            if set(index2_list + [index1]) != set(indices):
+                raise ValueError('Indices of the new item do not match existing indices')
+
+            d =IdxOrdDict()
             d[index1] = key
-            for k,v in zip(index2_list, value):
-                d[k] = v
-                self.indices[k][v] = d
-        else: # existing key
+            d[index2_list] = value # index2_list may also override index1
+            names = indices.keys()
+            values = d[names] # reorder based on the indices
+            d = IdxOrdDict(zip(names, values))
+
+            for i, v in d.items(): # append
+                indices[i][v] = d
+        else:
+            for i in index2_list:
+                if i not in indices:
+                    raise IndexNotExistsError(i)
             item_d[index2_list] = value
             if single:
                 old_value = [old_value]
-            for name, v_old, v_new in zip(index2_list, old_value, value):
-                od_replace_key(self.indices[name], v_old, v_new)
+            for i, v_old, v_new in zip(index2_list, old_value, value):
+                od_replace_key(indices[i], v_old, v_new)
 
 
     def __delitem__(self, args):
         '''
-        delete keys/values via multi-indexing
+        delete a key (and the whole item) via multi-indexing
         '''
-        index1, key, index2, item_d, value = mid_parse_args(self, args, ingore_index2=True)
+        item_d = mid_parse_args(self, args, ingore_index2=True)
         for name, v in item_d.items():
             del self.indices[name][v]
 
@@ -890,9 +1131,9 @@ class MultiIndexDict(AttrOrdDict):
         """
         Test for equality with *other*.
 
-        if `other` is a regular mapping/dict, compare only order-insensitive keys/values.
-        if `other` is also a OrderedDict, also compare the order of keys.
-        if `other` is also a MultiIndexDict, also compare the indices names.
+        if ``other`` is a regular mapping/dict, compare only order-insensitive keys/values.
+        if ``other`` is also a OrderedDict, also compare the order of keys.
+        if ``other`` is also a MultiIndexDict, also compare the index names.
 
         """
         if not isinstance(other, Mapping):
@@ -906,13 +1147,13 @@ class MultiIndexDict(AttrOrdDict):
             return False
         # equal length
 
-        if len(self.indices) == 0: # empty indices names, empty items
+        if len(self.indices) == 0: # empty index names, empty items
             return True
 
         if len(self.indices) != 2:
             return False
 
-        # ignore indices names
+        # ignore index names
         if isinstance(other, OrderedDict):
             d = OrderedDict(self.items()) # order-sensitive
         else:
@@ -926,16 +1167,16 @@ class MultiIndexDict(AttrOrdDict):
 
     def __lt__(self, other):
         '''
-        Check if `self < other`
+        Check if ``self < other``
 
-        If `other` is not a Mapping type, return NotImplemented.
+        If ``other`` is not a Mapping type, return NotImplemented.
 
-        If `other` is a Mapping type, compare in the following order:
+        If ``other`` is a Mapping type, compare in the following order:
             * length of items
             * length of indices
-            * convert `self` to an OrderedDict or a dict (depends on the type of `other`)
-              and compare it with `other`
-            * indices names (only if `other` is a MultiIndexDict)
+            * convert ``self`` to an OrderedDict or a dict (depends on the type of ``other``)
+              and compare it with ``other``
+            * index names (only if ``other`` is a MultiIndexDict)
 
         '''
         if not isinstance(other, Mapping):
@@ -972,7 +1213,7 @@ class MultiIndexDict(AttrOrdDict):
         # equal items
 
         if isinstance(other, MultiIndexDict):
-            # finally compare indices names
+            # finally compare index names
             return self.indices.keys() < other.indices.keys()
 
         return False # considered equal
@@ -1011,7 +1252,7 @@ class MultiIndexDict(AttrOrdDict):
                 if self.indices:
                     names = self.indices.keys()
                     return '%s(%s, %s)' % (self.__class__.__name__, self.items(), names)
-            except AttributeError: # may not have attr `indices` yet
+            except AttributeError: # may not have attr ``indices`` yet
                 pass
             return '%s()' % self.__class__.__name__
         finally:
@@ -1029,7 +1270,7 @@ class MultiIndexDict(AttrOrdDict):
 
 
     def clear(self, clear_indices=False):
-        'Remove all items. Indices names are removed if `clear_indices==True`.'
+        'Remove all items. index names are removed if ``clear_indices==True``.'
         if clear_indices:
             self.indices.clear()
         else:
@@ -1040,11 +1281,11 @@ class MultiIndexDict(AttrOrdDict):
     @classmethod
     def fromkeys(cls, keys, value=None):
         '''
-        Create a new dictionary with keys from `keys` and values set to value.
+        Create a new dictionary with keys from ``keys`` and values set to value.
 
         fromkeys() is a class method that returns a new dictionary. value defaults to None.
 
-        Length of `keys` must not exceed one because no duplicate values are allowed.
+        Length of ``keys`` must not exceed one because no duplicate values are allowed.
         '''
         if len(keys) > 1:
             raise ValueError('Length of keys (%s) must not exceed one because '
@@ -1057,9 +1298,9 @@ class MultiIndexDict(AttrOrdDict):
 
     def get(self, key, default=None):
         '''
-        Return the value for `key` if `key` is in the dictionary, else `default`.
-        If `default` is not given, it defaults to None, so that this method never
-        raises a `KeyError`.
+        Return the value for ``key`` if ``key`` is in the dictionary, else ``default``.
+        If ``default`` is not given, it defaults to None, so that this method never
+        raises a ``KeyError``.
 
         Support "multi-indexing" keys
         '''
@@ -1069,9 +1310,9 @@ class MultiIndexDict(AttrOrdDict):
             return None
 
 
-    def __contains__(self, key, index=0):
+    def __contains__(self, key):
         '''
-        Test for the presence of `key` in the dictionary.
+        Test for the presence of ``key`` in the dictionary.
 
         Support "multi-indexing" keys
         '''
@@ -1084,8 +1325,8 @@ class MultiIndexDict(AttrOrdDict):
 
     def has_key(self, key):
         '''
-        Test for the presence of `key` in the dictionary. has_key() is deprecated
-        in favor of `key in d`.
+        Test for the presence of ``key`` in the dictionary. has_key() is deprecated
+        in favor of ``key in d``.
 
         Support "multi-indexing" keys
         '''
@@ -1100,7 +1341,7 @@ class MultiIndexDict(AttrOrdDict):
 
 
     def __iter__(self, index=None):
-        'Return an iterator through keys in the `index` (defaults to the first index)'
+        'Return an iterator through keys in the ``index`` (defaults to the first index)'
         if self.indices:
             if index is None:
                 index = 0
@@ -1109,7 +1350,7 @@ class MultiIndexDict(AttrOrdDict):
 
 
     def __reversed__(self, index=None):
-        'Return an reversed iterator through keys in the `index` (defaults to the first index)'
+        'Return an reversed iterator through keys in the ``index`` (defaults to the first index)'
         if self.indices:
             if index is None:
                 index = 0
@@ -1118,26 +1359,26 @@ class MultiIndexDict(AttrOrdDict):
 
 
     def iterkeys(self, index=None):
-        'Return an iterator through keys in the `index` (defaults to the first index)'
+        'Return an iterator through keys in the ``index`` (defaults to the first index)'
         return self.__iter__(index)
 
 
     def keys(self, index=None):
-        'Return a copy list of keys in the `index` (defaults to the first index)'
+        'Return a copy list of keys in the ``index`` (defaults to the first index)'
         return list(self.iterkeys(index))
 
 
     def itervalues(self, index=None):
         '''
-        Return an iterator through values in the `index` (defaults to all indices
+        Return an iterator through values in the ``index`` (defaults to all indices
         except the first index).
 
-        When `index is None`, yielded values depend on the length of indices (`N`):
+        When ``index is None``, yielded values depend on the length of indices (``N``):
 
             * if N == 0: return
             * if N <= 2: yield values in the last index
             * if N > 2: yield values in all indices except the first index
-              (each value is a list of `N-1` elements)
+              (each value is a list of ``N-1`` elements)
         '''
         N = len(self.indices)
 
@@ -1165,48 +1406,52 @@ class MultiIndexDict(AttrOrdDict):
         for item_d in self.indices[0].values():
             yield item_d[index]
 
-
     def values(self, index=None):
         '''
-        Return a copy list of values in the `index`.
+        Return a copy list of values in the ``index``.
 
-        See the notes for `itervalues()`
+        See the notes for ``itervalues()``
         '''
         return list(self.itervalues(index))
 
 
     def iteritems(self, indices=None):
-        'Return an iterator through items in the `indices` (defaults to all indices)'
+        'Return an iterator through items in the ``indices`` (defaults to all indices)'
         if indices is None:
             indices = self.indices.keys()
         return self.itervalues(indices)
 
 
     def items(self, indices=None):
-        'Return a copy list of items in the `indices` (defaults to all indices)'
+        'Return a copy list of items in the ``indices`` (defaults to all indices)'
         return list(self.iteritems(indices))
 
 
     def update(self, *args, **kw):
         '''
-        (items, **kw)
-        (dict, **kw)
-        (MultiIndexDict, **kw)
+        Update the dictionary with items and names:
 
+            (items, names, **kw)
+            (dict, names, **kw)
+            (MultiIndexDict, names, **kw)
+
+        Optional positional argument ``names`` is only allowed when ``self.indices``
+        is empty (no indices are set yet).
         '''
-        if len(args) > 1:
-            raise ValueError('Only one positional argument '
-                '(items, dict, or MultiIndexDict) is allowed.')
+        if len(args) > 1 and self.indices:
+            raise ValueError('Only one positional argument is allowed when the'
+                'index names are already set.')
+
+        if not self.indices: # empty; init again
+            _mid_init(self, *args, **kw)
+            return
 
         d = MultiIndexDict(*args, **kw)
         if not d.indices:
             return
 
-        if not self.indices:
-            self.indices = d.indices
-            return
-
         names = self.indices.keys()
+        primary_index = names[0]
 
         if len(d.indices) != len(names):
             raise ValueError('Length of update items (%s) does not match '
@@ -1215,29 +1460,41 @@ class MultiIndexDict(AttrOrdDict):
         for item in d.items():
             item_d = IdxOrdDict(zip(names, item))
 
-            for i, (index, value) in enumerate(item_d.items()):
+            for index, value in zip(names, item):
                 index_d = self.indices[index]
                 if value in index_d:
-                    if i == 0: # main key
-                        del self[index:value] # del old item
-                    else:
-                        raise ValueError('Partially duplicate item: %s and %s'
-                            % (index_d[value].values(), item_d.values()))
-                index_d[value] = item_d
+                    if index == primary_index: # primary key; replace item
+                        item_d_old = index_d[value]
+                        item_old = item_d_old.values()
+                        for n, v_old, v_new in zip(names[1:], item_old[1:], item[1:]):
+                            if v_new in self.indices[n] and v_new != v_old:
+                                raise ValueError('Partially duplicate items not allowed: '
+                                    '%s and %s' % (self.indices[n][v_new].values(), item))
+
+                        item_d_old[names] = item # update to new values
+                        for n, v_old, v_new in zip(names[1:], item_old[1:], item[1:]):
+                            od_replace_key(self.indices[n], v_old, v_new)
+                        break # finished updating this item
+
+                    else: # not in primary_index
+                        raise ValueExistsError(value, index)
+            else: # no break; valid item_d
+                for index, value in zip(names, item):
+                    self.indices[index][value] = item_d
 
 
     def viewkeys(self, index=None):
-        '''a set-like object providing a view on the keys in `index`
+        '''a set-like object providing a view on the keys in ``index``
         (defaults to the first index)'''
         return MultiIndexKeysView(self, index)
 
     def viewvalues(self, index=None):
-        '''a set-like object providing a view on the values in `index`
+        '''a set-like object providing a view on the values in ``index``
         (defaults to all indices except the first index)'''
         return MultiIndexValuesView(self, index)
 
     def viewitems(self, index=None):
-        '''a set-like object providing a view on the items in `index`
+        '''a set-like object providing a view on the items in ``index``
         (defaults to all indices)'''
         return MultiIndexItemsView(self, index)
 
@@ -1246,19 +1503,19 @@ class MultiIndexDict(AttrOrdDict):
     # additional methods to handle index
 
 
-    def replace_index(self, *args):
+    def rename_index(self, *args):
         '''change the index name(s).
 
         * call with one argument:
-            1. list of new indices names (to replace all old names)
+            1. list of new index names (to replace all old names)
 
         * call with two arguments:
             1. old index name(s) (or index/indices)
             2. new index name(s)
         '''
-        old_indices = self.indices.keys()
         if len(args) == 1:
             new_indices = args[0]
+            old_indices = self.indices.keys()
         else:
             old_indices, new_indices = args
             old_indices, single = convert_index_keys(self.indices, old_indices)
@@ -1268,7 +1525,11 @@ class MultiIndexDict(AttrOrdDict):
         if len(new_indices) != len(old_indices):
             raise ValueError('Length of update indices (%s) does not match '
                 'existing indices (%s)' % (len(new_indices), len(old_indices)))
-            map(_check_index_name, new_indices)
+
+        map(_check_index_name, new_indices)
+
+        if len(new_indices) != len(set(new_indices)):
+            raise ValueError('New indices names are not unique')
 
         for item_d in self.indices[0].values():
             od_replace_key(item_d, old_indices, new_indices, multi=True)
@@ -1276,8 +1537,16 @@ class MultiIndexDict(AttrOrdDict):
         od_replace_key(self.indices, old_indices, new_indices, multi=True)
 
 
+    def reorder_indices(self, indices_in_new_order):
+        'reorder all the indices'
+        od_reorder_keys(self.indices, indices_in_new_order)
+        if self.indices:
+            for item_d in self.indices[0].values():
+                od_reorder_keys(item_d, indices_in_new_order)
+
+
     def add_index(self, items, name=None):
-        'add an index of `name` with the list of `items`'
+        'add an index of ``name`` with the list of ``items``'
         if len(items) != len(self) and len(items) and self.indices:
             raise ValueError('Length of items in added index (%s) does not match '
                 'length of existing items (%s)' % (len(items), len(self)))
@@ -1298,7 +1567,7 @@ class MultiIndexDict(AttrOrdDict):
 
 
     def remove_index(self, index):
-        'remove an index. `index` can be the name (str) or index (int)'
+        'remove an index. ``index`` can be the name (str) or index (int)'
         if not self.indices:
             raise KeyError('Index not found (dictionary is empty): %s' % (index,))
         for item_d in self.indices[0].values():
@@ -1306,11 +1575,21 @@ class MultiIndexDict(AttrOrdDict):
         del self.indices[index]
 
 
+    def todict(self, dict_cls=dict):
+        'convert to normal dict'
+        if len(self.indices) == 2:
+            return dict_cls(self.items())
+        elif len(self.indices) == 0:
+            return dict_cls()
+        else:
+            raise TypeError('Can not convert to a dict as the indices do not match')
+
+
 ############################################
 
 
 class MultiIndexKeysView(KeysView):
-    '''a set-like object providing a view on the keys in `index`
+    '''a set-like object providing a view on the keys in ``index``
     (defaults to the first index)'''
     def __init__(self, mapping, index=0):
         if index not in mapping.indices:
@@ -1326,7 +1605,7 @@ class MultiIndexKeysView(KeysView):
 
 
 class MultiIndexValuesView(ValuesView):
-    '''a set-like object providing a view on the values in `index`
+    '''a set-like object providing a view on the values in ``index``
     (defaults to all indices except the first index)'''
     def __init__(self, mapping, index=None):
         if index is not None and index not in mapping.indices:
@@ -1345,7 +1624,7 @@ class MultiIndexValuesView(ValuesView):
 
 
 class MultiIndexItemsView(ItemsView):
-    '''a set-like object providing a view on the items in `index`
+    '''a set-like object providing a view on the items in ``index``
     (defaults to all indices)'''
     def __init__(self, mapping, index=None):
         if index is not None and index not in mapping.indices:
@@ -1361,6 +1640,27 @@ class MultiIndexItemsView(ItemsView):
 
     def __iter__(self):
         return self._mapping.iteritems(self.index)
+
+
+
+############################################
+
+class MultiIndexDictError(Exception):
+    'Base class for MultiIndexDict exceptions'
+    pass
+
+
+class ValueExistsError(KeyError, MultiIndexDictError):
+    '''
+    Value already exists in an index and can not be used as a key.
+
+    Usage::
+
+        ValueExistsException(value, index)
+    '''
+    def __str__(self):
+        """Get a string representation of this exception for use with str."""
+        return 'Value {0!r} exists in index {1!r}'.format(*self.args)
 
 
 
@@ -1397,7 +1697,7 @@ def test():
     d['uid':2, ::2]
     d.indices.uid[1].name
     len(d)
-    d.replace_index(['a','b','c'])
+    d.rename_index(['a','b','c'])
 
     d = MultiIndexDict()
     # init like this:
@@ -1408,11 +1708,11 @@ def test():
     d.b = 20
     d[:1] = 'a'
     d[:3] = 'c'
-    d.replace_index(['uid', 'name'])
-    d.replace_index(['a', 'b'])
+    d.rename_index(['uid', 'name'])
+    d.rename_index(['a', 'b'])
     d['uid':2] = 'jack'
     d['uid':2, 'name'] = 'jack'
-    d.replace_index('uid', 'a')
+    d.rename_index('uid', 'a')
 
     od = OrderedDict(a=1,b=2)
 
