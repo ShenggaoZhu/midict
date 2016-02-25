@@ -366,7 +366,7 @@ def _get_value_len(value):
 
 def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
     '''
-    Parse the arguments for indexing in MultiIndexDict.
+    Parse the arguments for indexing in MIDict.
 
     Full syntax: ``d[index1:key, index2]``.
 
@@ -512,7 +512,7 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
 
 def _mid_init(self, *args, **kw):
     '''
-    Separate __init__ function of MultiIndexDict
+    Separate __init__ function of MIDict
     '''
 
     items, names = [], None
@@ -523,7 +523,7 @@ def _mid_init(self, *args, **kw):
         items = args[0]
 
         if isinstance(items, Mapping): # copy from dict
-            if isinstance(items, MultiIndexDict):
+            if isinstance(items, MIDict):
                 names = items.indices.keys() # names may be overwritten by second arg
             items = items.items()
         else: # try to get data from items() or keys() method
@@ -602,12 +602,12 @@ def _mid_init(self, *args, **kw):
             index_d[value] = item_d
 
 
-class MultiIndexDict(AttrOrdDict):
+class MIDict(AttrOrdDict):
     '''
-    A dictionary that has multiple indices and can index multiple items.
+    A multi-index dictionary (MIDict) with flexible multi-item indexing syntax.
 
-    Multi-indices
-    -------------
+    Multiple indices
+    ----------------
 
     Consider a table-like data set (e.g., a user table):
 
@@ -619,20 +619,21 @@ class MultiIndexDict(AttrOrdDict):
     |  tony   |    2    |  192.2  |
     +---------+---------+---------+
 
-    In each column, elements are unique and hashable (suitable for dict keys).
+    In each index (i.e., column), elements are unique and hashable (suitable
+    for dict keys).
 
     A multi-index ``user`` dictionary can be constructed with two arguments:
     a list of items (rows of data), and a list of index names::
 
-        user = MultiIndexDict([['jack', 1, '192.1'],
-                               ['tony', 2, '192.2']],
-                              ['name', 'uid', 'ip'])
+        user = MIDict([['jack', 1, '192.1'],
+                       ['tony', 2, '192.2']],
+                      ['name', 'uid', 'ip'])
 
-    Index names are for humans and indexing, and thus must be ``str`` or ``unicode``.
-    The indices and items are ordered in the dictionary. Compatible with a
-    normal dict, the first index (column) is the primary index to lookup/index
-    a key, while the rest index or indices contain the corresponding key's
-    value or list of values::
+    Index names are for easy human understanding and indexing, and thus
+    must be ``str`` or ``unicode`` type. The indices (and items) are ordered
+    in the dictionary. Compatible with a normal dict, the first index (column)
+    is the primary index to lookup/index a key, while the rest index or indices
+    contain the corresponding key's value or list of values::
 
         user['jack'] -> [1, '192.1']
 
@@ -644,21 +645,21 @@ class MultiIndexDict(AttrOrdDict):
         user['name':'jack', 'uid'] -> 1
         user['ip':'192.1', 'name'] -> 'jack'
 
-    Here, ``index1`` is the single index used as the "keys", and ``key`` is
+    Here, ``index1`` is the single column used as the "keys", and ``key`` is
     an element in ``index1`` to locate the row of record in the table.
-    ``index2`` can be one or more indices to specify the value(s) from the row
+    ``index2`` can be one or more columns to specify the value(s) from the row
     of record.
 
 
-    Indexing multi-items
-    --------------------
+    Multi-item indexing
+    -------------------
 
     For a multi-column data set, it's useful to be able to access multiple
     columns/indices at the same time.
 
-    In the advanced indexing syntax ``d[index1:key, index2]``,
-    both ``index1`` and ``index2`` support flexible indexing using an int,
-    tuple, list or slice object, which means (see ``IndexDict`` for more details)::
+    In the indexing syntax ``d[index1:key, index2]``, both ``index1`` and
+    ``index2`` support flexible indexing using an int, tuple, list or slice
+    object, which means (see ``IndexDict`` for more details)::
 
         int -> the index of a key in d.keys()
         tuple/list -> multiple keys or indices of keys or mixture
@@ -695,15 +696,15 @@ class MultiIndexDict(AttrOrdDict):
     Compatible with normal dict
     ---------------------------
 
-    A MultiIndexDict with 2 indices is fully compatible with the normal dict
+    A MIDict with 2 indices is fully compatible with the normal dict
     or OrderedDict, and can be used as a drop-in replacement of the latter::
 
         normal_dict = dict(jack=1, tony=2)
-        mi_dict = MultiIndexDict(jack=1, tony=2)
-        <==> mi_dict = MultiIndexDict(normal_dict)
+        mi_dict = MIDict(jack=1, tony=2)
+        <==> mi_dict = MIDict(normal_dict)
 
         normal_dict -> {'tony': 2, 'jack': 1}
-        mi_dict -> MultiIndexDict([['tony', 2], ['jack', 1]], ['index_0', 'index_1'])
+        mi_dict -> MIDict([['tony', 2], ['jack', 1]], ['index_0', 'index_1'])
 
         # the following equality checks all return True:
 
@@ -716,11 +717,11 @@ class MultiIndexDict(AttrOrdDict):
     Bidirectional dict
     ------------------
 
-    With the advanced indexing syntax, a MultiIndexDict with 2 indices
+    With the advanced indexing syntax, a MIDict with 2 indices
     can be used as a normal dict, as well as a convenient
     **bidirectional dict** to index using either a key or a value::
 
-        mi_dict = MultiIndexDict(jack=1, tony=2)
+        mi_dict = MIDict(jack=1, tony=2)
 
     * Forward indexing (``d[key] -> value``, like a normal dict)::
 
@@ -736,7 +737,7 @@ class MultiIndexDict(AttrOrdDict):
     Attributes as keys
     ------------------
 
-    Use the attribute syntax to access a key in MultiIndexDict if it is a valid
+    Use the attribute syntax to access a key in MIDict if it is a valid
     Python identifier (``d.key`` <==> d['key'])::
 
         mi_dict.jack <==> mi_dict['jack']
@@ -756,9 +757,9 @@ class MultiIndexDict(AttrOrdDict):
     ``iterkeys()``, ``itervalues()``, ``iteritems()``, ``viewkeys()``, ``viewvalues()``,
     ``viewitems()``, ``__iter__()`` and ``__reversed__()``::
 
-        user = MultiIndexDict([['jack', 1, '192.1'],
-                               ['tony', 2, '192.2']],
-                              ['name', 'uid', 'ip'])
+        user = MIDict([['jack', 1, '192.1'],
+                       ['tony', 2, '192.2']],
+                      ['name', 'uid', 'ip'])
 
         user.keys() <==> user.keys(0) <==> user.keys('name') -> ['jack', 'tony']
         user.keys('uid') <==> user.keys(1) -> [1, 2]
@@ -774,47 +775,45 @@ class MultiIndexDict(AttrOrdDict):
 
     Additional APIs to handle indices
     ---------------------------------
-    MultiIndexDict provides handy APIs (``d.reorder_indices()``, ``d.rename_index()``,
+    MIDict provides handy APIs (``d.reorder_indices()``, ``d.rename_index()``,
     ``d.add_index()``, ``d.remove_index()``) to handle the indices::
 
-        d = MultiIndexDict([['jack', 1],
-                            ['tony', 2]],
-                           ['name', 'uid'])
+        d = MIDict([['jack', 1], ['tony', 2]], ['name', 'uid'])
 
         d.reorder_indices(['uid', 'name'])
-        d -> MultiIndexDict([[1, 'jack'], [2, 'tony']], ['uid', 'name'])
+        d -> MIDict([[1, 'jack'], [2, 'tony']], ['uid', 'name'])
 
         d.reorder_indices(['name', 'uid']) # change back indices
 
         d.rename_index('uid', 'userid') # rename one index
         <==> d.rename_index(['name', 'userid']) # rename all indices
-        d -> MultiIndexDict([['jack', 1], ['tony', 2]], ['name', 'userid'])
+        d -> MIDict([['jack', 1], ['tony', 2]], ['name', 'userid'])
 
         d.add_index(items=['192.1', '192.2'], name='ip')
-        d -> MultiIndexDict([['jack', 1, '192.1'], ['tony', 2, '192.2']],
+        d -> MIDict([['jack', 1, '192.1'], ['tony', 2, '192.2']],
                             ['name', 'userid', 'ip'])
 
         d.remove_index('userid')
-        d -> MultiIndexDict([['jack', '192.1'], ['tony', '192.2']], ['name', 'ip'])
+        d -> MIDict([['jack', '192.1'], ['tony', '192.2']], ['name', 'ip'])
         d.remove_index(['name', 'ip']) # remove multiple indices
-        d -> MultiIndexDict() # empty
+        d -> MIDict() # empty
 
 
     Duplicate keys/values handling
     ------------------------------
 
-    The elements in each index of MultiIndexDict should be unique.
+    The elements in each index of MIDict should be unique.
 
     When setting an item using syntax ``d[index1:key, index2] = value2``,
     if ``key`` already exists in ``index1``, the item of ``key`` will be updated
     according to ``index2`` and ``value2``. However, if any value of ``value2``
     already exists in ``index2``, a ``ValueExistsError`` will be raised.
 
-    When constructing a MultiIndexDict or updating it with ``d.update()``,
+    When constructing a MIDict or updating it with ``d.update()``,
     duplicate keys/values are handled in the same way as above with
     the first index treated as ``index1`` and the rest indices treated as ``index2``::
 
-        d = MultiIndexDict(jack=1, tony=2)
+        d = MIDict(jack=1, tony=2)
 
         d['jack'] = 10 # replace value of key 'jack'
         d['tom'] = 3 # add new key/value
@@ -827,21 +826,19 @@ class MultiIndexDict(AttrOrdDict):
         d.update([['alice', 2]]) # raise ValueExistsError
         d.update(alice=2) # raise ValueExistsError
 
-        MultiIndexDict([['jack',1]], jack=2) # {'jack': 2}
-        MultiIndexDict([['jack',1], ['jack',2]]) # {'jack': 2}
-        MultiIndexDict([['jack',1], ['tony',1]]) # raise ValueExistsError
-        MultiIndexDict([['jack',1]], tony=1) # raise ValueExistsError
+        MIDict([['jack',1]], jack=2) # {'jack': 2}
+        MIDict([['jack',1], ['jack',2]]) # {'jack': 2}
+        MIDict([['jack',1], ['tony',1]]) # raise ValueExistsError
+        MIDict([['jack',1]], tony=1) # raise ValueExistsError
 
 
     Internal data struture
     ----------------------
 
-    Internally MultiIndexDict uses a 3-level ordered dicts ``d.indices`` to store
+    Internally MIDict uses a 3-level ordered dicts ``d.indices`` to store
     the items and indices and keep the order of them::
 
-        d = MultiIndexDict([['jack', 1],
-                            ['tony', 2]],
-                           ['name', 'uid'])
+        d = MIDict([['jack', 1], ['tony', 2]], ['name', 'uid'])
 
         d.indices ->
 
@@ -885,8 +882,8 @@ class MultiIndexDict(AttrOrdDict):
 
     * Example of two indices (compatible with normal dict)::
 
-        color = MultiIndexDict([['red', '#FF0000'], ['green', '#00FF00']],
-                               ['name', 'hex'])
+        color = MIDict([['red', '#FF0000'], ['green', '#00FF00']],
+                       ['name', 'hex'])
 
         # flexible indexing of short and long versions:
 
@@ -918,17 +915,17 @@ class MultiIndexDict(AttrOrdDict):
         <==> color[1:'#0000FF', 0] = 'blue'
 
         # result:
-        # color -> MultiIndexDict([['red', '#FF0000'],
-                                   ['green', '#00FF00'],
-                                   ['blue', '#0000FF']],
-                                  ['name', 'hex'])
+        # color -> MIDict([['red', '#FF0000'],
+                           ['green', '#00FF00'],
+                           ['blue', '#0000FF']],
+                          ['name', 'hex'])
 
 
     * Example of three indices::
 
-        user = MultiIndexDict([[1, 'jack', '192.1'],
-                               [2, 'tony', '192.2']],
-                              ['uid', 'name', 'ip'])
+        user = MIDict([[1, 'jack', '192.1'],
+                       [2, 'tony', '192.2']],
+                      ['uid', 'name', 'ip'])
 
         user[1]                     -> ['jack', '192.1']
         user['name':'jack']         -> [1, '192.1']
@@ -944,10 +941,10 @@ class MultiIndexDict(AttrOrdDict):
         user['uid':1, 'name','ip']  -> ['jack', '192.1']
         user[0:3, ['name','ip']] = ['tom', '192.3'] # set a new item
         # result:
-        # user -> MultiIndexDict([[1, 'jack', '192.1'],
-                                  [2, 'tony', '192.2'],
-                                  [3, 'tom', '192.3']],
-                                 ['uid', 'name', 'ip'])
+        # user -> MIDict([[1, 'jack', '192.1'],
+                          [2, 'tony', '192.2'],
+                          [3, 'tom', '192.3']],
+                         ['uid', 'name', 'ip'])
 
     '''
 
@@ -957,7 +954,7 @@ class MultiIndexDict(AttrOrdDict):
 
             (items, names, **kw)
             (dict, names, **kw)
-            (MultiIndexDict, names, **kw)
+            (MIDict, names, **kw)
 
         ``names`` and ``kw`` are optional.
 
@@ -972,30 +969,28 @@ class MultiIndexDict(AttrOrdDict):
             rows_of_data = [[1, 'jack', '192.1'],
                             [2, 'tony', '192.2']]
 
-            user = MultiIndexDict(rows_of_data, index_names)
+            user = MIDict(rows_of_data, index_names)
 
-            user = MultiIndexDict(rows_of_data)
-            <==> user = MultiIndexDict(rows_of_data, ['index_0', 'index_1', 'index_2'])
+            user = MIDict(rows_of_data)
+            <==> user = MIDict(rows_of_data, ['index_0', 'index_1', 'index_2'])
 
 
         Construct from normal dict:
 
             normal_dict = {'jack':1, 'tony':2}
-            user = MultiIndexDict(normal_dict.items(), ['name', 'uid'])
-            # user -> MultiIndexDict([['tony', 2], ['jack', 1]], ['name', 'uid'])
+            user = MIDict(normal_dict.items(), ['name', 'uid'])
+            # user -> MIDict([['tony', 2], ['jack', 1]], ['name', 'uid'])
 
         '''
-        # MultiIndexDict.__mro__:
-        # (MultiIndexDict, AccessibleOrderedDict, MultiDict, OrderedDict, dict, object)
-
-
+        # MIDict.__mro__:
+        # (MIDict, AccessibleOrderedDict, MultiDict, OrderedDict, dict, object)
 
 
         _mid_init(self, *args, **kw)
 
         # set normal attributes (instead of dict keys) before calling super's __init__()
 
-        super(MultiIndexDict, self).__init__() # self is the internal dict
+        super(MIDict, self).__init__() # self is the internal dict
 
 
     def __getitem__(self, args):
@@ -1015,14 +1010,14 @@ class MultiIndexDict(AttrOrdDict):
         If ``d.indices`` is empty (i.e., no index names are set), index names
         can be created when setting a new item with specified names:
 
-            d = MultiIndexDict()
+            d = MIDict()
             d['uid':1, 'name'] = 'jack'
-            # d -> MultiIndexDict([[1, 'jack']], ['uid', 'name'])
+            # d -> MIDict([[1, 'jack']], ['uid', 'name'])
 
         If ``d.indices`` is not empty, when setting a new item, all indices and values
         must be specified:
 
-            d = MultiIndexDict([['jack', 1, '192.1']], ['name', 'uid', 'ip'])
+            d = MIDict([['jack', 1, '192.1']], ['name', 'uid', 'ip'])
             d['tony'] = [2, '192.2']
             <==> d['name':'tony',['uid', 'ip']] = [2, '192.2']
             # the following will not work:
@@ -1030,7 +1025,7 @@ class MultiIndexDict(AttrOrdDict):
 
         More examles::
 
-            d = MultiIndexDict(jack=1, tony=2)
+            d = MIDict(jack=1, tony=2)
 
             d['jack'] = 10 # replace value of key 'jack'
             d['tom'] = 3 # add new key/value
@@ -1133,13 +1128,13 @@ class MultiIndexDict(AttrOrdDict):
 
         if ``other`` is a regular mapping/dict, compare only order-insensitive keys/values.
         if ``other`` is also a OrderedDict, also compare the order of keys.
-        if ``other`` is also a MultiIndexDict, also compare the index names.
+        if ``other`` is also a MIDict, also compare the index names.
 
         """
         if not isinstance(other, Mapping):
             return NotImplemented
 
-        if isinstance(other, MultiIndexDict):
+        if isinstance(other, MIDict):
             return self.indices == other.indices
         # other Mapping types
 
@@ -1176,7 +1171,7 @@ class MultiIndexDict(AttrOrdDict):
             * length of indices
             * convert ``self`` to an OrderedDict or a dict (depends on the type of ``other``)
               and compare it with ``other``
-            * index names (only if ``other`` is a MultiIndexDict)
+            * index names (only if ``other`` is a MIDict)
 
         '''
         if not isinstance(other, Mapping):
@@ -1189,7 +1184,7 @@ class MultiIndexDict(AttrOrdDict):
             return False
         # equal item length
 
-        if isinstance(other, MultiIndexDict):
+        if isinstance(other, MIDict):
             len_other_indices = len(other.indices)
         else:
             len_other_indices = 2
@@ -1212,7 +1207,7 @@ class MultiIndexDict(AttrOrdDict):
             return False
         # equal items
 
-        if isinstance(other, MultiIndexDict):
+        if isinstance(other, MIDict):
             # finally compare index names
             return self.indices.keys() < other.indices.keys()
 
@@ -1242,7 +1237,7 @@ class MultiIndexDict(AttrOrdDict):
 
 
     def __repr__(self, _repr_running={}):
-        'repr as "MultiIndexDict(items, names)"'
+        'repr as "MIDict(items, names)"'
         call_key = id(self), _get_ident()
         if call_key in _repr_running:
             return '<%s(...)>' % self.__class__.__name__
@@ -1433,7 +1428,7 @@ class MultiIndexDict(AttrOrdDict):
 
             (items, names, **kw)
             (dict, names, **kw)
-            (MultiIndexDict, names, **kw)
+            (MIDict, names, **kw)
 
         Optional positional argument ``names`` is only allowed when ``self.indices``
         is empty (no indices are set yet).
@@ -1446,7 +1441,7 @@ class MultiIndexDict(AttrOrdDict):
             _mid_init(self, *args, **kw)
             return
 
-        d = MultiIndexDict(*args, **kw)
+        d = MIDict(*args, **kw)
         if not d.indices:
             return
 
@@ -1486,17 +1481,17 @@ class MultiIndexDict(AttrOrdDict):
     def viewkeys(self, index=None):
         '''a set-like object providing a view on the keys in ``index``
         (defaults to the first index)'''
-        return MultiIndexKeysView(self, index)
+        return MIKeysView(self, index)
 
     def viewvalues(self, index=None):
         '''a set-like object providing a view on the values in ``index``
         (defaults to all indices except the first index)'''
-        return MultiIndexValuesView(self, index)
+        return MIValuesView(self, index)
 
     def viewitems(self, index=None):
         '''a set-like object providing a view on the items in ``index``
         (defaults to all indices)'''
-        return MultiIndexItemsView(self, index)
+        return MIItemsView(self, index)
 
 
     ############################################
@@ -1588,14 +1583,14 @@ class MultiIndexDict(AttrOrdDict):
 ############################################
 
 
-class MultiIndexKeysView(KeysView):
+class MIKeysView(KeysView):
     '''a set-like object providing a view on the keys in ``index``
     (defaults to the first index)'''
     def __init__(self, mapping, index=0):
         if index not in mapping.indices:
             raise KeyError('Index not found: %s' % (index,))
         self.index = index
-        super(MultiIndexKeysView, self).__init__(mapping)
+        super(MIKeysView, self).__init__(mapping)
 
     def __contains__(self, key):
         return key in self._mapping.indices[self.index]
@@ -1604,14 +1599,14 @@ class MultiIndexKeysView(KeysView):
         return self._mapping.iterkeys(self.index)
 
 
-class MultiIndexValuesView(ValuesView):
+class MIValuesView(ValuesView):
     '''a set-like object providing a view on the values in ``index``
     (defaults to all indices except the first index)'''
     def __init__(self, mapping, index=None):
         if index is not None and index not in mapping.indices:
             raise KeyError('Index not found: %s' % (index,))
         self.index = index
-        super(MultiIndexValuesView, self).__init__(mapping)
+        super(MIValuesView, self).__init__(mapping)
 
     def __contains__(self, value):
         for v in iter(self):
@@ -1623,14 +1618,14 @@ class MultiIndexValuesView(ValuesView):
         return self._mapping.itervalues(self.index)
 
 
-class MultiIndexItemsView(ItemsView):
+class MIItemsView(ItemsView):
     '''a set-like object providing a view on the items in ``index``
     (defaults to all indices)'''
     def __init__(self, mapping, index=None):
         if index is not None and index not in mapping.indices:
             raise KeyError('Index not found: %s' % (index,))
         self.index = index
-        super(MultiIndexItemsView, self).__init__(mapping)
+        super(MIItemsView, self).__init__(mapping)
 
     def __contains__(self, item):
         for v in iter(self):
@@ -1645,12 +1640,12 @@ class MultiIndexItemsView(ItemsView):
 
 ############################################
 
-class MultiIndexDictError(Exception):
-    'Base class for MultiIndexDict exceptions'
+class MIDictError(Exception):
+    'Base class for MIDict exceptions'
     pass
 
 
-class ValueExistsError(KeyError, MultiIndexDictError):
+class ValueExistsError(KeyError, MIDictError):
     '''
     Value already exists in an index and can not be used as a key.
 
@@ -1663,6 +1658,8 @@ class ValueExistsError(KeyError, MultiIndexDictError):
         return 'Value {0!r} exists in index {1!r}'.format(*self.args)
 
 
+############################################
+
 
 def test():
     m = IdxOrdDict(a=1,b=2)
@@ -1674,7 +1671,7 @@ def test():
 
 
 
-    d = MultiIndexDict([[1, 'jack', ('192.100', 81)],
+    d = MIDict([[1, 'jack', ('192.100', 81)],
                         [2, 'tony', ('192.100', 82)]],
                        ['uid', 'name', 'ip'])
 
@@ -1699,7 +1696,7 @@ def test():
     len(d)
     d.rename_index(['a','b','c'])
 
-    d = MultiIndexDict()
+    d = MIDict()
     # init like this:
     d[:'jack', 'uid'] = 1
 
