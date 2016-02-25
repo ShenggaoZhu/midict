@@ -1,3 +1,3 @@
 #
 
-from .midict import MultiIndexDict
+from .midict import MIDict, FrozenMIDict
