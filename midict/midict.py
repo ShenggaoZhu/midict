@@ -1011,15 +1011,20 @@ class MIMapping(AttrOrdDict):
         return MIItemsView(self, index)
 
 
-    def todict(self, dict_cls=dict):
-        'convert to normal dict (discarding index names)'
-        if len(self.indices) == 2:
-            return dict_cls(self.items())
-        elif len(self.indices) == 0:
-            return dict_cls()
-        else:
-            raise TypeError('Can not convert to a dict as the indices do not match')
+    def viewdict(self, index_key=0, index_value=-1):
+        '''a dict-like object providing a view on the keys in ``index_key``
+        (defaults to the first index) and values in ``index_value`` (defaults
+        to the last index)'''
+        return MIDictView(self, index_key, index_value )
 
+
+    def todict(self, dict_type=dict, index_key=0, index_value=-1):
+        '''convert to a specific type of dict using ``index_key`` as keys
+        and ``index_value`` as values (discarding index names)'''
+        if self.indices:
+            return dict_type(self.items([index_key, index_value]))
+        else: # empty
+            return dict_type()
 
 ############################################
 
@@ -1193,6 +1198,11 @@ class MIDict(MIMapping):
         user.items() <==> user.values(['name', 'uid', 'ip'])
                             -> [['jack', 1, '192.1'], ['tony', 2, '192.2']]
         user.items(['name','ip']) -> [['jack', '192.1'], ['tony', '192.2']]
+
+    MIDict also provides two handy methods ``d.viewdict(index_key, index_value)``
+    and ``d.todict(dict_type, index_key, index_value)`` to view it as a normal
+    dict or convert it to a specific type of dict using specified indices as
+    keys and values.
 
 
     Additional APIs to handle indices
@@ -1629,7 +1639,7 @@ class MIDict(MIMapping):
 
 
 class FrozenMIDict(MIMapping, Hashable):
-    """Immutable, hashable MIDict type."""
+    """Immutable, hashable multi-index dictionary"""
 
     def __init__(self, *args, **kw):
         # set _hash as a normal attribute before init
@@ -1699,6 +1709,46 @@ class MIItemsView(ItemsView):
     def __iter__(self):
         return self._mapping.iteritems(self.index)
 
+
+class MIDictView(KeysView):
+    '''a dict-like object providing a view on the keys in ``index_key``
+    (defaults to the first index) and values in ``index_value`` (defaults
+    to the last index)'''
+    def __init__(self, mapping, index_key=0, index_value=-1):
+        for index in [index_key, index_value]:
+            if index not in mapping.indices:
+                raise KeyError('Index not found: %s' % (index,))
+        self.index_key = index_key
+        self.index_value = index_value
+        super(MIDictView, self).__init__(mapping)
+
+    def __contains__(self, key):
+        return key in self._mapping.indices[self.index_key]
+
+    def __iter__(self):
+        return self._mapping.iterkeys(self.index_key)
+
+    def iterkeys(self):
+        return iter(self)
+
+    def itervalues(self):
+        return self._mapping.iterkeys(self.index_value)
+
+    def iteritems(self):
+        return self._mapping.iteritems([self.index_key, self.index_value])
+
+    def keys(self):
+        return list(self.iterkeys())
+
+    def values(self):
+        return list(self.itervalues())
+
+    def items(self):
+        return list(self.iteritems())
+
+    def __repr__(self):
+        return ('{0.__class__.__name__}({0._mapping!r}, index_key={0.index_key}, '
+            'index_value={0.index_value})').format(self)
 
 
 ############################################

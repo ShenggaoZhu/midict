@@ -170,6 +170,11 @@ which index/indices to use, including ``keys()``, ``values()``, ``items()``,
                         -> [['jack', 1, '192.1'], ['tony', 2, '192.2']]
     user.items(['name','ip']) -> [['jack', '192.1'], ['tony', '192.2']]
 
+MIDict also provides two handy methods ``d.viewdict(index_key, index_value)``
+and ``d.todict(dict_type, index_key, index_value)`` to view it as a normal
+dict or convert it to a specific type of dict using specified indices as
+keys and values.
+
 
 Additional APIs to handle indices
 ---------------------------------
