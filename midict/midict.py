@@ -1843,5 +1843,29 @@ def test():
     d['uid':2, 'name'] = 'jack'
     d.rename_index('uid', 'a')
 
-#    od = OrderedDict(a=1,b=2)
+
+    from pympler.asizeof import asizeof as getsizeof
+
+    od = OrderedDict(a=1,b=2)
+
+    d = MIDict([[1, 'jack'],
+                [2, 'tony'],
+                [3, 'tom']],
+               ['uid', 'name'])
+
+    print getsizeof(od)
+    print getsizeof(d)
+    print getsizeof(d.indices)
+    print getsizeof(d.indices[0])
+    print getsizeof(d.indices[-1])
+    print getsizeof(d.indices[0].values()[0])
+    '''
+408
+488
+1976
+1416
+1416
+440
+    '''
+
 
