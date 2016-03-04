@@ -96,6 +96,8 @@ class AttrDict(dict):
         so that these remain as normal attributes
         '''
         super(AttrDict, self).__init__(*args, **kw)
+
+        # last line of code in __init__()
         self.__attr2item = True # transfered to _AttrDict__attr2item
 
     # easy access of items through attributes, e.g., d.key
@@ -142,6 +144,22 @@ class AttrDict(dict):
             super(AttrDict, self).__delattr__(item)
         else:
             self.__delitem__(item)
+
+
+
+def convert_dict(d, cls=AttrDict):
+    '''
+    recursively convert a normal Mapping `d` and it's values to a specified type
+    (defaults to AttrDict)
+    '''
+    for k, v in d.items():
+        if isinstance(v, Mapping):
+            d[k] = convert_dict(v)
+        elif isinstance(v, list):
+            for i, e in enumerate(v):
+                if isinstance(e, Mapping):
+                    v[i] = convert_dict(e)
+    return cls(d)
 
 
 
@@ -681,9 +699,6 @@ class MIMapping(AttrOrdDict):
 
 
     ############################################
-    # inherited methods from OrderedDict:
-    # __ne__, __reduce__
-
 
     def __len__(self):
         'Number of the items in an index'
@@ -726,7 +741,7 @@ class MIMapping(AttrOrdDict):
 
         return d == other
 
-#    def __ne__(self, other):
+#    def __ne__(self, other): # inherited from OrderedDict
 #        return not self == other
 
 
@@ -824,6 +839,10 @@ class MIMapping(AttrOrdDict):
             del _repr_running[call_key]
 
 
+    def __reduce__(self):
+        'Return state information for pickling'
+        return self.__class__, (), self.__dict__
+
 #    def __sizeof__(self):
 #        'not accurate.. '
 #        try:
@@ -901,13 +920,13 @@ class MIMapping(AttrOrdDict):
     # copy, pop, popitem, setdefault
 
 
-    def __iter__(self, index=None):
+    def __iter__(self, index=0):
         'Return an iterator through keys in the ``index`` (defaults to the first index)'
         if self.indices:
-            if index is None:
-                index = 0
             for k in self.indices[index]:
                 yield k
+        else:
+            raise KeyError('Index not found (dictionary is empty): %s' % (index,))
 
 
     def __reversed__(self, index=None):
@@ -1643,13 +1662,13 @@ class FrozenMIDict(MIMapping, Hashable):
 
     def __init__(self, *args, **kw):
         # set _hash as a normal attribute before init
-        self._hash = NotImplemented
+        self._hash = None
 
         super(FrozenMIDict, self).__init__(*args, **kw)
 
     def __hash__(self):
         """Return the hash of this bidict."""
-        if self._hash is NotImplemented:
+        if self._hash is None:
             self._hash = hash((frozenset(self.viewitems()), frozenset(self.indices.viewkeys())))
         return self._hash
 
