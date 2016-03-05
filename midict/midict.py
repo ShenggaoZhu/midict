@@ -895,13 +895,13 @@ class MIMapping(AttrOrdDict):
     # inherited methods from OrderedDict:
     # copy, pop, popitem, setdefault
 
-    def __iter__(self, index=0):
+    def __iter__(self, index=None):
         'Return an iterator through keys in the ``index`` (defaults to the first index)'
         if self.indices:
+            if index is None:
+                index = 0
             for k in self.indices[index]:
                 yield k
-        else:
-            raise KeyError('Index not found (dictionary is empty): %s' % (index,))
 
     def __reversed__(self, index=None):
         'Return an reversed iterator through keys in the ``index`` (defaults to the first index)'
