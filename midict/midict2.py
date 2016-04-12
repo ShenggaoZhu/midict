@@ -933,6 +933,10 @@ class MIMapping(AttrOrdDict):
         'Return state information for pickling'
         return self.__class__, (), self.__dict__
 
+    def copy(self):
+        'od.copy() -> a shallow copy of od'
+        return self.__class__(self)
+
 #    def __sizeof__(self):
 #        'not accurate.. '
 #        try:
