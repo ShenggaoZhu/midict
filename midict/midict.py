@@ -84,7 +84,7 @@ class AttrDict(dict):
     Be aware that besides all the inherited attributes, AttrDict has an
     additional internal attribute "_AttrDict__attr2item".
 
-    Example:
+    Example::
 
         d = AttrDict(__init__='value for key "__init__"')
         d.__init__ -> <bound method AttrDict.__init__>
@@ -99,7 +99,7 @@ class AttrDict(dict):
         super(AttrDict, self).__init__(*args, **kw)
 
         # last line of code in __init__()
-        self.__attr2item = True  # transfered to _AttrDict__attr2item
+        self.__attr2item = True # transfered to _AttrDict__attr2item
 
     # easy access of items through attributes, e.g., d.key
     def __getattr__(self, item):
@@ -144,6 +144,7 @@ class AttrDict(dict):
             self.__delitem__(item)
 
 
+
 def convert_dict(d, cls=AttrDict):
     '''
     recursively convert a normal Mapping `d` and it's values to a specified type
@@ -159,6 +160,7 @@ def convert_dict(d, cls=AttrDict):
     return cls(d)
 
 
+
 def _index_to_key(keys, index):
     'Convert int ``index`` to the corresponding key in ``keys``'
     if isinstance(index, int):
@@ -169,6 +171,46 @@ def _index_to_key(keys, index):
             #            IndexNotExistsError()
             raise KeyError('Index out of range of keys: %s' % (index,))
     return index
+
+
+def _key_to_index(keys, key, single=False):
+    'convert `key` to int or list of int'
+    if isinstance(key, int): # validate the int index
+        try:
+            keys[key]
+        except IndexError:
+            raise KeyError('Index out range of keys: %s' % (key,))
+        if key < 0:
+            key += len(keys)
+        return key
+#    keys = d.keys()
+    if not single:
+        if isinstance(key, (tuple, list)):
+            return [_key_to_index_single(keys, k) for k in key]
+
+        if isinstance(key, slice):
+            start, stop, step = key.start, key.stop, key.step
+            try:
+                _check_index_name(start)
+                start = keys.index(start)
+            except TypeError:
+                pass
+            try:
+                _check_index_name(stop)
+                stop = keys.index(stop)
+            except TypeError:
+                pass
+#            return slice(start, stop, step)
+            args = slice(start, stop, step).indices(len(keys))
+            return range(*args)
+    try:
+        return keys.index(key)
+    except IndexError:
+        raise KeyError('Key not found: %s' % (key,))
+
+
+def _key_to_index_single(keys, key):
+    return _key_to_index(keys, key, single=True)
 
 
 def convert_index_keys(d, item):
@@ -432,9 +474,9 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
     if empty:
         index1_last = False
 
-        names = []  # list of names already passed in as arguments
+        exist_names = []  # list of names already passed in as arguments
         if index1 is not _default:
-            if index1 is None:
+            if index1 is None: # slice syntax d[:key]
                 index1_last = True
                 index1 = _default
             elif isinstance(index1, int):
@@ -442,33 +484,33 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
                                 'is empty: %s' % (index1,))
             else:
                 _check_index_name(index1)
-                names.append(index1)
+                exist_names.append(index1)
         if index2 is not _default:
             if isinstance(index2, (tuple, list)):
                 map(_check_index_name, index2)
-                names.extend(index2)
+                exist_names.extend(index2)
             elif isinstance(index2, (int, slice)):
                 raise TypeError('Index2 can not be int or slice when '
                                 'dictionary is empty: %s' % (index2,))
             else:
                 _check_index_name(index2)
-                names.append(index2)
+                exist_names.append(index2)
 
         # auto generate index names and avoid conficts with existing names
         if index1 is _default:
             if index1_last:
-                if len(names) > 1:
-                    name1 = 'index_%s' % (len(names) + 1)
+                if len(exist_names) > 1: # index2 is specified
+                    name1 = 'index_%s' % (len(exist_names) + 1)
                 else:
                     name1 = 'index_2'
             else:
                 name1 = 'index_1'
-            index1 = _get_unique_name(name1, names)
-            names.append(index1)
+            index1 = _get_unique_name(name1, exist_names)
+            exist_names.append(index1)
 
         if index2 is _default:
             name2 = 'index_1' if index1_last else 'index_2'
-            index2 = _get_unique_name(name2, names)
+            index2 = _get_unique_name(name2, exist_names)
 
         return index1, key, index2, index1_last
 
@@ -479,50 +521,171 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
     elif index1 is None:  # slice syntax d[:key]
         index1 = -1
 
-    # index1 is always returned as a normal key, not int
-    index1 = _index_to_key(names, index1)
+    # index1 is always returned as an int
+    index1 = _key_to_index_single(names, index1)
 
     try:
-        index_d = self.indices[index1]
-    except KeyError:
-        raise KeyError('Index not found: %s' % (index1,))
-
-    try:
-        item_d = index_d[key]
+        item = mid_get_item(self, key, index1)
     except KeyError:
         if allow_new:  # new key for setitem; item_d = None
-            item_d = None
+            item = None
         else:
             raise KeyError('Key not found in index "%s": %s' % (index1, key))
 
     if ingore_index2:  # used by delitem
-        return item_d
+        return item
 
     if index2 is _default:  # not specified
         # index2 defaults to all indices except index1
         if len(names) == 1:
             index2 = 0  # index2 defaults to the only one index
-#            raise KeyError('Index2 must be specified when only 1 index exists')
         else:
-            index2 = [n for n in names if n != index1]
+            index2 = range(len(names))
+            index2.remove(index1)
             if len(index2) == 1:  # single index
                 index2 = index2[0]
+    else:
+        # index2 is always returned as int or list of int
+        index2 = _key_to_index(names, index2)
 
-    index2 = _index_to_key(names, index2)
-
-    if item_d is None:  # allow_new
+    if item is None:  # allow_new
         return index1, key, index2, None, None
 
     try:
-        value = item_d[index2]
-    except KeyError:
+        value = mget_list(item, index2)
+    except IndexError:
         raise KeyError('Index not found: %s' % (index2,))
-    return index1, key, index2, item_d, value
+    return index1, key, index2, item, value
+
+
+def mget_list(item, index):
+    'get mulitple items via index of int, slice or list'
+    if isinstance(index, (int, slice)):
+        return item[index]
+    else:
+        return map(item.__getitem__, index)
+
+
+def mset_list(item, index, value):
+    'set mulitple items via index of int, slice or list'
+    if isinstance(index, (int, slice)):
+        item[index] = value
+    else:
+        return map(item.__setitem__, index, value)
+
+
+def mid_get_item(self, key, index=0):
+    'return list of item'
+    index = _key_to_index_single(self.indices.keys(), index)
+    if index != 0:
+        key = self.indices[index][key]  # always use first index key
+    # key must exist
+    value = super(MIMapping, self).__getitem__(key)
+    N = len(self.indices)
+    if N == 1:
+        return [key]
+
+    if N == 2:
+        value = [value]
+    return [key] + value
+
+
+def _mid_setitem(self, args, value):
+    'Separate __setitem__ function of MIMapping'
+    indices = self.indices
+    N = len(indices)
+    empty = N == 0
+    if empty:
+        index1, key, index2, index1_last = mid_parse_args(self, args, allow_new=True)
+        exist_names = [index1]
+        item = [key]
+        try:
+            _check_index_name(index2)
+            exist_names.append(index2)
+            item.append(value)
+        except TypeError:
+            Nvalue, value = _get_value_len(value)
+            if len(index2) != Nvalue:
+                raise ValueError(
+                    'Number of keys (%s) based on argument %s does not match '
+                    'number of values (%s)' % (len(index2), index2, Nvalue))
+            exist_names.extend(index2)
+            item.extend(value)
+        if index1_last:
+            exist_names = exist_names[1:] + exist_names[:1]
+            item = item[1:] + item[:1]
+
+        _mid_init(self, [item], exist_names)
+        return
+
+    index1, key, index2, item, old_value = mid_parse_args(self, args, allow_new=True)
+    names = indices.keys()
+    is_new_key = item is None
+    single = isinstance(index2, int)
+
+    if single:
+        index2_list = [index2]
+        value = [value]
+        old_value = [old_value]
+    else:
+        index2_list = index2
+        Nvalue, value = _get_value_len(value)
+        if len(index2_list) != Nvalue:
+            raise ValueError('Number of keys (%s) based on argument %s does not match '
+                             'number of values (%s)' % (len(index2_list), index2, Nvalue))
+        if is_new_key:
+            old_value = [None] * Nvalue  # fake it
+
+    # remove duplicate in index2_list
+    index2_d = OrderedDict()
+    for e, index in enumerate(index2_list):
+        index2_d[index] = e # order of each unique index
+    if len(index2_d) < len(index2_list): # exist duplicate indices
+        idx = index2_d.values()
+        index2_list = mget_list(index2_list, idx)
+        value = mget_list(value, idx)
+        old_value = mget_list(old_value, idx)
+
+    # check duplicate values
+    for i, v, old_v in zip(index2_list, value, old_value):
+        # index2_list may contain index1; not allow duplicate value for index1 either
+        if v in indices[i]:
+            if is_new_key or v != old_v:
+                raise ValueExistsError(v, i)
+
+    if is_new_key:  # new key
+        if set(index2_list + [index1]) != set(range(N)):
+            raise ValueError('Indices of the new item do not match existing indices')
+
+        d = {}
+        d[index1] = key
+        # index2_list may also override index1
+        d.update(zip(index2_list, value))
+        values = [d[i] for i in range(N)]  # reorder based on the indices
+        key = values[0]
+        val = values[1] if len(values) == 2 else values[1:]
+        super(MIMapping, self).__setitem__(key, val)
+        for i, v in zip(names[1:], values[1:]):
+            indices[i][v] = key
+
+    else:
+        key1 = item[0]
+        item2 = list(item)  # copy item first
+        mset_list(item2, index2_list, value)
+        key2 = item2[0]
+        val = item2[1] if len(item2) == 2 else item2[1:]
+        if key1 == key2:
+            super(MIMapping, self).__setitem__(key1, val)
+        else:
+            od_replace_key(self, key1, key2, val)
+
+        for i, v_old, v_new in zip(names[1:], item[1:], item2[1:]):
+            od_replace_key(indices[i], v_old, v_new, key2)
 
 
 def _mid_init(self, *args, **kw):
     '''
-    Separate __init__ function of MIDict
+    Separate __init__ function of MIMapping
     '''
 
     items, names = [], None
@@ -555,8 +718,6 @@ def _mid_init(self, *args, **kw):
 
     if items:  # check item length
         n_index = len(items[0])
-        #            if n_index == 1:
-        #                raise ValueError('Length of item must be larger than 1')
         for item in items[1:]:
             if len(item) != n_index:
                 raise ValueError('Length of all items must equal')
@@ -586,30 +747,24 @@ def _mid_init(self, *args, **kw):
                 raise TypeError('Index name must be a str or unicode. '
                                 'found type %s for %s' % (type(name), name))
 
-    self.indices = d = IdxOrdDict()  # the internal dict
+    d = self.indices = IdxOrdDict() # the internal dict
     for index in names:
         if index in d:
             raise ValueError('Duplicate index name: %s' % (index,))
         d[index] = AttrOrdDict()
 
-    # remove duplicate keys/items based on first index keys
-    # for items with the same first index key, the last item will be used
-    # duplicate keys in indices other than first index are not allowed
-    items_d = OrderedDict()
-    for item in items:
-        if item:
+    if n_index > 0:
+        d[0] = self
+        for item in items:
             primary_key = item[0]
-            items_d[primary_key] = item
-    items = items_d.values()
-
-    for item in items:
-        item_d = IdxOrdDict(zip(names, item))
-
-        for i, (index, value) in enumerate(item_d.items()):
-            index_d = d[index]
-            if value in index_d:  # surely not in the primary key/first index
-                raise ValueExistsError(value, index)
-            index_d[value] = item_d
+            if n_index == 1:
+                value = primary_key
+            elif n_index == 2:
+                value = item[1]
+            else:
+                value = list(item[1:])
+            # will handle duplicate
+            _mid_setitem(self, primary_key, value)
 
 
 class MIMapping(AttrOrdDict):
@@ -656,14 +811,15 @@ class MIMapping(AttrOrdDict):
             # user -> MIDict([['tony', 2], ['jack', 1]], ['name', 'uid'])
 
         '''
-        # MIDict.__mro__:
-        # (MIDict, AccessibleOrderedDict, MultiDict, OrderedDict, dict, object)
+
+
+        # assign attr `indices` before calling super's __init__()
+        self.indices = None  # will be used as the internal dict
+
+        super(MIMapping, self).__init__()
 
         _mid_init(self, *args, **kw)
 
-        # set normal attributes (instead of dict keys) before calling super's __init__()
-
-        super(MIMapping, self).__init__()  # self is the internal dict
 
     def __getitem__(self, args):
         '''
@@ -686,12 +842,8 @@ class MIMapping(AttrOrdDict):
 
     ############################################
 
-    def __len__(self):
-        'Number of the items in an index'
-        try:
-            return len(self.indices.values()[0])
-        except Exception:
-            return 0
+#    def __len__(self): # not changed
+
 
     def __eq__(self, other):
         """
@@ -706,7 +858,8 @@ class MIMapping(AttrOrdDict):
             return NotImplemented
 
         if isinstance(other, MIMapping):
-            return self.indices == other.indices
+            return (super(MIMapping, self).__eq__(other) and
+                self.indices.keys() == other.indices.keys())
         # other Mapping types
 
         if len(self) != len(other):
@@ -719,13 +872,7 @@ class MIMapping(AttrOrdDict):
         if len(self.indices) != 2:
             return False
 
-        # ignore index names
-        if isinstance(other, OrderedDict):
-            d = OrderedDict(self.items())  # order-sensitive
-        else:
-            d = dict(self.items())  # order-insensitive
-
-        return d == other
+        return super(MIMapping, self).__eq__(other) # ignore indices
 
 #    def __ne__(self, other): # inherited from OrderedDict
 #        return not self == other
@@ -747,17 +894,11 @@ class MIMapping(AttrOrdDict):
         if not isinstance(other, Mapping):
             return NotImplemented
 
-        diff = len(self) - len(other)
-        if diff < 0:
-            return True
-        elif diff > 0:
-            return False
-        # equal item length
-
         if isinstance(other, MIMapping):
-            len_other_indices = len(other.indices)
-        else:
-            len_other_indices = 2
+            return (super(MIMapping, self).__lt__(other) and
+                self.indices.keys() < other.indices.keys())
+
+        len_other_indices = 2 if len(other) else 0
 
         diff = len(self.indices) - len_other_indices
         if diff < 0:
@@ -766,22 +907,7 @@ class MIMapping(AttrOrdDict):
             return False
         # equal indices length
 
-        if isinstance(other, OrderedDict):
-            d = OrderedDict(self.items())  # order-sensitive
-        else:
-            d = dict(self.items())  # order-insensitive
-
-        if d < other:
-            return True
-        elif d > other:
-            return False
-        # equal items
-
-        if isinstance(other, MIMapping):
-            # finally compare index names
-            return self.indices.keys() < other.indices.keys()
-
-        return False  # considered equal
+        return super(MIMapping, self).__lt__(other) # ignore indices
 
     # use __lt__
 
@@ -825,6 +951,10 @@ class MIMapping(AttrOrdDict):
     def __reduce__(self):
         'Return state information for pickling'
         return self.__class__, (), self.__dict__
+
+    def copy(self):
+        'od.copy() -> a shallow copy of od'
+        return self.__class__(self)
 
 #    def __sizeof__(self):
 #        'not accurate.. '
@@ -897,19 +1027,40 @@ class MIMapping(AttrOrdDict):
 
     def __iter__(self, index=None):
         'Return an iterator through keys in the ``index`` (defaults to the first index)'
+
         if self.indices:
             if index is None:
                 index = 0
-            for k in self.indices[index]:
-                yield k
+            if index == 0:
+                # use super otherwise infinite loop of __iter__
+                return super(MIMapping, self).__iter__()
+            else:
+                return iter(self.indices[index])
+
+        else:
+            if index is None:
+                return iter(())
+            else:
+                raise KeyError('Index not found (dictionary is empty): %s' % (index,))
+
 
     def __reversed__(self, index=None):
         'Return an reversed iterator through keys in the ``index`` (defaults to the first index)'
         if self.indices:
             if index is None:
                 index = 0
-            for k in reversed(self.indices[index]):  # reverse OrderedDict
-                yield k
+            if index == 0:
+                # use super otherwise infinite loop of __iter__
+                return super(MIMapping, self).__reversed__()
+            else: # OrderedDict reverse
+                return reversed(self.indices[index])
+
+        else:
+            if index is None:
+                return iter(())
+            else:
+                raise KeyError('Index not found (dictionary is empty): %s' % (index,))
+
 
     def iterkeys(self, index=None):
         'Return an iterator through keys in the ``index`` (defaults to the first index)'
@@ -926,36 +1077,31 @@ class MIMapping(AttrOrdDict):
 
         When ``index is None``, yielded values depend on the length of indices (``N``):
 
-            * if N == 0: return
-            * if N <= 2: yield values in the last index
+            * if N <= 1: return
+            * if N == 2: yield values in the 2nd index
             * if N > 2: yield values in all indices except the first index
               (each value is a list of ``N-1`` elements)
         '''
         N = len(self.indices)
 
         if index is None:
-            if N == 0:
+            if N <= 1:
                 return
-            elif N <= 2:
-                index = -1
+            elif N == 2:
+                index = 1
             else:
                 index = slice(1, None)
+        else:
+            index = _key_to_index(self.indices.keys(), index)
 
-        index, single = convert_index_keys(self.indices, index)
+        multi = not isinstance(index, int)
 
-        if single:
-            for k in self.indices[index]:
-                yield k
-            return
-
-        if N == 0:
-            if len(index) == 0:
-                return
-            else:
-                raise KeyError('Index not found (dictionary is empty): %s' % (index,))
-
-        for item_d in self.indices[0].values():
-            yield tuple(item_d[index])  # convert to tuple
+        for key in self:
+            item = mid_get_item(self, key)
+            value = mget_list(item, index)
+            if multi:
+                value = tuple(value)  # convert to tuple
+            yield value
 
     def values(self, index=None):
         '''
@@ -996,7 +1142,7 @@ class MIMapping(AttrOrdDict):
         (defaults to all indices)'''
         return MIItemsView(self, index)
 
-    def viewdict(self, index_key=0, index_value=-1):
+    def viewdict(self, index_key=None, index_value=None):
         '''a dict-like object providing a view on the keys in ``index_key``
         (defaults to the first index) and values in ``index_value`` (defaults
         to the last index)'''
@@ -1005,7 +1151,7 @@ class MIMapping(AttrOrdDict):
     def todict(self, dict_type=dict, index_key=0, index_value=-1):
         '''convert to a specific type of dict using ``index_key`` as keys
         and ``index_value`` as values (discarding index names)'''
-        if self.indices:
+        if len(self):
             return dict_type(self.items([index_key, index_value]))
         else:  # empty
             return dict_type()
@@ -1205,9 +1351,9 @@ class MIDict(MIMapping):
         <==> d.rename_index(['name', 'userid']) # rename all indices
         d -> MIDict([['jack', 1], ['tony', 2]], ['name', 'userid'])
 
-        d.add_index(items=['192.1', '192.2'], name='ip')
+        d.add_index(values=['192.1', '192.2'], name='ip')
         d -> MIDict([['jack', 1, '192.1'], ['tony', 2, '192.2']],
-                            ['name', 'userid', 'ip'])
+                    ['name', 'userid', 'ip'])
 
         d.remove_index('userid')
         d -> MIDict([['jack', '192.1'], ['tony', '192.2']], ['name', 'ip'])
@@ -1241,6 +1387,7 @@ class MIDict(MIMapping):
 
         d.update([['alice', 2]]) # raise ValueExistsError
         d.update(alice=2) # raise ValueExistsError
+        d.update(alice=4) # add new key/value
 
         MIDict([['jack',1]], jack=2) # {'jack': 2}
         MIDict([['jack',1], ['jack',2]]) # {'jack': 2}
@@ -1400,91 +1547,26 @@ class MIDict(MIMapping):
             d['jack', :] = ['jack2', 11] # replace item of key 'jack'
 
         '''
-        indices = self.indices
-        empty = len(indices) == 0
-        if empty:
-            index1, key, index2, index1_last = mid_parse_args(self, args, allow_new=True)
-            exist_names = [index1]
-            item = [key]
-            try:
-                _check_index_name(index2)
-                exist_names.append(index2)
-                item.append(value)
-            except TypeError:
-                Nvalue, value = _get_value_len(value)
-                if len(index2) != Nvalue:
-                    raise ValueError(
-                        'Number of keys (%s) based on argument %s does not match '
-                        'number of values (%s)' % (len(index2), index2, Nvalue))
-                exist_names.extend(index2)
-                item.extend(value)
-            if index1_last:
-                exist_names = exist_names[1:] + exist_names[:1]
-                item = item[1:] + item[:1]
-
-            _mid_init(self, [item], exist_names)
-            return
-
-        index1, key, index2, item_d, old_value = mid_parse_args(self,
-                                                                args,
-                                                                allow_new=True)
-        is_new_key = item_d is None
-        index2_list, single = convert_index_keys(indices, index2)
-
-        if single:
-            index2_list = [index2_list]
-            value = [value]
-        else:
-            Nvalue, value = _get_value_len(value)
-            if len(index2_list) != Nvalue:
-                raise ValueError(
-                    'Number of keys (%s) based on argument %s does not match '
-                    'number of values (%s)' % (len(index2_list), index2, Nvalue))
-
-        # check duplicate values
-        for i, v in zip(index2_list, value):
-            # index2_list may contain index1; now allow duplicate value for index1 either
-            if v in indices[i]:
-                if is_new_key or v != item_d[i]:
-                    raise ValueExistsError(v, i)
-
-        if is_new_key:  # new key
-            if set(index2_list + [index1]) != set(indices):
-                raise ValueError('Indices of the new item do not match existing indices')
-
-            d = IdxOrdDict()
-            d[index1] = key
-            d[index2_list] = value  # index2_list may also override index1
-            names = indices.keys()
-            values = d[names]  # reorder based on the indices
-            d = IdxOrdDict(zip(names, values))
-
-            for i, v in d.items():  # append
-                indices[i][v] = d
-        else:
-            for i in index2_list:
-                if i not in indices:
-                    raise KeyError('Index not found: %s' % (i,))
-            item_d[index2_list] = value
-            if single:
-                old_value = [old_value]
-            for i, v_old, v_new in zip(index2_list, old_value, value):
-                od_replace_key(indices[i], v_old, v_new)
+        return _mid_setitem(self, args, value)
 
     def __delitem__(self, args):
         '''
         delete a key (and the whole item) via multi-indexing
         '''
-        item_d = mid_parse_args(self, args, ingore_index2=True)
-        for name, v in item_d.items():
-            del self.indices[name][v]
+        item = mid_parse_args(self, args, ingore_index2=True)
+        for i, v in enumerate(item):
+            if i == 0:
+                super(MIMapping, self).__delitem__(v)
+            else:
+                del self.indices[i][v]
 
     def clear(self, clear_indices=False):
         'Remove all items. index names are removed if ``clear_indices==True``.'
+        super(MIMapping, self).clear()
         if clear_indices:
             self.indices.clear()
         else:
-            for index_d in self.indices.values():
+            for index_d in self.indices[1:]:
                 index_d.clear()
 
     def update(self, *args, **kw):
@@ -1517,33 +1599,37 @@ class MIDict(MIMapping):
                              'length of original items (%s)' %
                              (len(d.indices), len(names)))
 
-        primary_index = names[0]
+        for key in d:
+            # use __setitem__() to handle duplicate
+            self[key] = d[key]
 
-        for item in d.items():
-            item_d = IdxOrdDict(zip(names, item))
-
-            for index, value in zip(names, item):
-                index_d = self.indices[index]
-                if value in index_d:
-                    if index == primary_index:  # primary key; replace item
-                        item_d_old = index_d[value]
-                        item_old = item_d_old.values()
-                        for n, v_old, v_new in zip(names[1:], item_old[1:], item[1:]):
-                            if v_new in self.indices[n] and v_new != v_old:
-                                raise ValueError('Partially duplicate items not allowed: '
-                                                 '%s and %s' %
-                                                 (self.indices[n][v_new].values(), item))
-
-                        item_d_old[names] = item  # update to new values
-                        for n, v_old, v_new in zip(names[1:], item_old[1:], item[1:]):
-                            od_replace_key(self.indices[n], v_old, v_new)
-                        break  # finished updating this item
-
-                    else:  # not in primary_index
-                        raise ValueExistsError(value, index)
-            else:  # no break; valid item_d
-                for index, value in zip(names, item):
-                    self.indices[index][value] = item_d
+#        primary_index = names[0]
+#
+#        for item in d.items():
+#            item_d = IdxOrdDict(zip(names, item))
+#
+#            for index, value in zip(names, item):
+#                index_d = self.indices[index]
+#                if value in index_d:
+#                    if index == primary_index:  # primary key; replace item
+#                        item_d_old = index_d[value]
+#                        item_old = item_d_old.values()
+#                        for n, v_old, v_new in zip(names[1:], item_old[1:], item[1:]):
+#                            if v_new in self.indices[n] and v_new != v_old:
+#                                raise ValueError('Partially duplicate items not allowed: '
+#                                                 '%s and %s' %
+#                                                 (self.indices[n][v_new].values(), item))
+#
+#                        item_d_old[names] = item  # update to new values
+#                        for n, v_old, v_new in zip(names[1:], item_old[1:], item[1:]):
+#                            od_replace_key(self.indices[n], v_old, v_new)
+#                        break  # finished updating this item
+#
+#                    else:  # not in primary_index
+#                        raise ValueExistsError(value, index)
+#            else:  # no break; valid item_d
+#                for index, value in zip(names, item):
+#                    self.indices[index][value] = item_d
 
     ############################################
     # additional methods to handle index
@@ -1575,47 +1661,80 @@ class MIDict(MIMapping):
         map(_check_index_name, new_indices)
 
         if len(new_indices) != len(set(new_indices)):
-            raise ValueError('New indices names are not unique')
-
-        for item_d in self.indices[0].values():
-            od_replace_key(item_d, old_indices, new_indices, multi=True)
+            raise ValueError('New indices names are not unique: %s' % (new_indices,))
 
         od_replace_key(self.indices, old_indices, new_indices, multi=True)
 
-    def reorder_indices(self, indices_in_new_order):
-        'reorder all the indices'
-        od_reorder_keys(self.indices, indices_in_new_order)
-        if self.indices:
-            for item_d in self.indices[0].values():
-                od_reorder_keys(item_d, indices_in_new_order)
 
-    def add_index(self, items, name=None):
-        'add an index of ``name`` with the list of ``items``'
-        if len(items) != len(self) and len(items) and self.indices:
-            raise ValueError('Length of items in added index (%s) does not match '
-                             'length of existing items (%s)' % (len(items), len(self)))
+    def reorder_indices(self, indices_order):
+        'reorder all the indices'
+        # allow mixed index syntax like int
+        indices_order, single = convert_index_keys(self.indices, indices_order)
+        old_indices = self.indices.keys()
+
+        if indices_order == old_indices: # no changes
+            return
+
+        if set(old_indices) != set(indices_order):
+            raise KeyError('Keys in the new order do not match existing keys')
+
+        if len(old_indices) == 0:
+            return
+
+        # must have more than 1 index to reorder
+        new_idx = [old_indices.index(i) for i in indices_order]
+        # reorder items
+        items = [map(i.__getitem__, new_idx) for i in self.items()]
+        self.clear(True)
+        _mid_init(self, items, indices_order)
+
+
+    def add_index(self, values, name=None):
+        'add an index of ``name`` with the list of ``values``'
+        if len(values) != len(set(values)):
+            raise ValueError('Values in the new index are not unique')
+
+        d = self.indices
+        if len(values) != len(self) and len(values) and d:
+            raise ValueError('Length of values in added index (%s) does not match '
+                             'length of existing items (%s)' % (len(values), len(self)))
 
         if name is None:
-            name = 'index_' + str(len(self.indices))
-
-        if self.indices:
-            d = AttrOrdDict()
-            for item, item_d in zip(items, self.indices[0].values()):
-                item_d[name] = item
-                d[name] = item_d
-            self.indices[name] = d
+            name = 'index_' + str(len(d))
+            name = _get_unique_name(name, d)
         else:
-            self.indices[name] = d = AttrOrdDict()
-            for item in items:
-                d[item] = IdxOrdDict([[name, item]])
+            _check_index_name(name)
+            if name in d:
+                raise ValueError('Duplicate index name: %s' % (name,))
+
+        if len(d) == 0:
+            items = [(v,) for v in values]
+        else:
+            items = [i+(v,) for i, v in zip(self.items(), values)]
+
+        names = d.keys() + [name]
+
+        self.clear(True)
+        _mid_init(self, items, names)
+
 
     def remove_index(self, index):
-        'remove an index. ``index`` can be the name (str) or index (int)'
-        if not self.indices:
-            raise KeyError('Index not found (dictionary is empty): %s' % (index,))
-        for item_d in self.indices[0].values():
-            del item_d[index]
-        del self.indices[index]
+        'remove one or more indices'
+        index_rm = _key_to_index(self.indices.keys(), index)
+        if isinstance(index_rm, int):
+            index_rm = [index_rm]
+
+        index_new = [i for i in range(len(self.indices)) if i not in index_rm]
+
+        if not index_new: # no index left
+            self.clear(True)
+            return
+
+        names = mget_list(self.indices.keys(), index_new)
+        items = [mget_list(i, index_new) for i in self.items()]
+        self.clear(True)
+        _mid_init(self, items, names)
+
 
 ############################################
 
@@ -1643,14 +1762,20 @@ class MIKeysView(KeysView):
     '''a set-like object providing a view on the keys in ``index``
     (defaults to the first index)'''
 
-    def __init__(self, mapping, index=0):
-        if index not in mapping.indices:
+    def __init__(self, mapping, index=None):
+        if index is not None and index not in mapping.indices:
             raise KeyError('Index not found: %s' % (index,))
         self.index = index
         super(MIKeysView, self).__init__(mapping)
 
     def __contains__(self, key):
-        return key in self._mapping.indices[self.index]
+        if self._mapping.indices:
+            index = self.index
+            if index is None:
+                index = 0
+            return key in self._mapping.indices[index]
+        else:
+            return False
 
     def __iter__(self):
         return self._mapping.iterkeys(self.index)
@@ -1667,7 +1792,7 @@ class MIValuesView(ValuesView):
         super(MIValuesView, self).__init__(mapping)
 
     def __contains__(self, value):
-        for v in iter(self):
+        for v in self:
             if value == v:
                 return True
         return False
@@ -1687,7 +1812,7 @@ class MIItemsView(ItemsView):
         super(MIItemsView, self).__init__(mapping)
 
     def __contains__(self, item):
-        for v in iter(self):
+        for v in self:
             if item == v:
                 return True
         return False
@@ -1701,16 +1826,22 @@ class MIDictView(KeysView):
     (defaults to the first index) and values in ``index_value`` (defaults
     to the last index)'''
 
-    def __init__(self, mapping, index_key=0, index_value=-1):
+    def __init__(self, mapping, index_key=None, index_value=None):
         for index in [index_key, index_value]:
-            if index not in mapping.indices:
+            if index is not None and index not in mapping.indices:
                 raise KeyError('Index not found: %s' % (index,))
         self.index_key = index_key
         self.index_value = index_value
         super(MIDictView, self).__init__(mapping)
 
     def __contains__(self, key):
-        return key in self._mapping.indices[self.index_key]
+        if self._mapping.indices:
+            index = self.index_key
+            if index is None:
+                index = 0
+            return key in self._mapping.indices[index]
+        else:
+            return False
 
     def __iter__(self):
         return self._mapping.iterkeys(self.index_key)
@@ -1722,7 +1853,12 @@ class MIDictView(KeysView):
         return self._mapping.iterkeys(self.index_value)
 
     def iteritems(self):
-        return self._mapping.iteritems([self.index_key, self.index_value])
+        if self._mapping.indices:
+            return self._mapping.iteritems([
+                0 if self.index_key is None else self.index_key,
+                -1 if self.index_value is None else self.index_value])
+        else:
+            return iter(())
 
     def keys(self):
         return list(self.iterkeys())
@@ -1814,6 +1950,8 @@ def test():
 
     d = MIDict([[1, 'jack'], [2, 'tony'], [3, 'tom']], ['uid', 'name'])
 
+    d = FrozenMIDict([[1, 'jack'], [2, 'tony'], [3, 'tom']], ['uid', 'name'])
+
     print getsizeof(od)
     print getsizeof(d)
     print getsizeof(d.indices)
@@ -1823,8 +1961,8 @@ def test():
     '''
 408
 488
-1976
-1416
-1416
-440
+1136
+488
+488
+48
     '''
