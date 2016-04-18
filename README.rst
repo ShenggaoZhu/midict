@@ -2,7 +2,9 @@
 MIDict (Multi-Index Dict)
 =========================
 
-A multi-index dictionary (MIDict) with flexible multi-item indexing syntax.
+A multi-index dictionary (MIDict) allowing any index as the "keys" or "values"
+(suitable for bidirectional/inverse dict) with powerful indexing syntax to
+assess multiple values.
 
 Multiple indices
 ----------------
@@ -18,18 +20,22 @@ Consider a table-like data set (e.g., a user table):
 +---------+---------+---------+
 
 In each index (i.e., column), elements are unique and hashable (suitable
-for dict keys).
+for dict keys). Here, a "super dict" is wanted to represent this table
+which allows any index (column) to be used as the "keys" to index the table.
+Such a "super dict" is called a multi-index dictionary (MIDict).
 
-A multi-index ``user`` dictionary can be constructed with two arguments:
-a list of items (rows of data), and a list of index names::
+A multi-index dictionary ``user`` can be constructed with two arguments:
+a list of items (rows of data), and a list of index names:
+
+.. code-block:: python
 
     user = MIDict([['jack', 1, '192.1'],
                    ['tony', 2, '192.2']],
                   ['name', 'uid', 'ip'])
 
 Index names are for easy human understanding and indexing, and thus
-must be ``str`` or ``unicode`` type. The indices (and items) are ordered
-in the dictionary. Compatible with a normal dict, the first index (column)
+must be a ``str`` (or ``unicode``) type. The index names and items are ordered
+in the dictionary. Compatible with a normal ``dict``, the first index (column)
 is the primary index to lookup/index a key, while the rest index or indices
 contain the corresponding key's value or list of values::
 
@@ -44,9 +50,9 @@ indexing syntax ``d[index1:key, index2]``, e.g.::
     user['ip':'192.1', 'name'] -> 'jack'
 
 Here, ``index1`` is the single column used as the "keys", and ``key`` is
-an element in ``index1`` to locate the row of record in the table.
-``index2`` can be one or more columns to specify the value(s) from the row
-of record.
+an element in ``index1`` to locate the row of record (e.g.,
+``['jack', 1, '192.1']``) in the table. ``index2`` can be one or more columns
+to specify the value(s) from the row of record.
 
 
 Multi-item indexing
@@ -56,8 +62,10 @@ For a multi-column data set, it's useful to be able to access multiple
 columns/indices at the same time.
 
 In the indexing syntax ``d[index1:key, index2]``, both ``index1`` and
-``index2`` support flexible indexing using an int, tuple, list or slice
-object, which means (see ``IndexDict`` for more details)::
+``index2`` support flexible indexing using a normal key or an ``int``,
+and ``index2`` can also be a ``tuple``, ``list`` or ``slice`` object
+to specify multiple columns/indices, with the following meanings
+(see ``IndexDict`` for more details)::
 
     int -> the index of a key in d.keys()
     tuple/list -> multiple keys or indices of keys or mixture
@@ -91,6 +99,26 @@ Examples::
     user['jack', :] -> ['jack', 1, '192.1']
 
 
+Bidirectional/inverse dict
+--------------------------
+
+With the advanced indexing syntax, a MIDict with 2 indices
+can be used as a normal dict, as well as a convenient
+**bidirectional dict** to index using either a key or a value::
+
+    mi_dict = MIDict(jack=1, tony=2)
+
+* Forward indexing like a normal dict (``d[key] -> value``)::
+
+      mi_dict['jack'] -> 1
+      <==> mi_dict[0:'jack', 1]
+
+* Backward/inverse indexing using the slice syntax (``d[:value] -> key``)::
+
+      mi_dict[:1] -> 'jack'
+      <==> mi_dict[-1:1, 0]
+
+
 Compatible with normal dict
 ---------------------------
 
@@ -99,37 +127,19 @@ or OrderedDict, and can be used as a drop-in replacement of the latter::
 
     normal_dict = dict(jack=1, tony=2)
     mi_dict = MIDict(jack=1, tony=2)
-    <==> mi_dict = MIDict(normal_dict)
 
-    normal_dict -> {'tony': 2, 'jack': 1}
-    mi_dict -> MIDict([['tony', 2], ['jack', 1]], ['index_0', 'index_1'])
-
-    # the following equality checks all return True:
+The following equality checks all return ``True``::
 
     mi_dict == normal_dict
     normal_dict['jack'] == mi_dict['jack'] == 1
     normal_dict.keys() == mi_dict.keys() == ['tony', 'jack']
     normal_dict.values() == mi_dict.values() == [2, 1]
 
+Conversion between ``MIDict`` and ``dict`` is supported in both directions::
 
-Bidirectional dict
-------------------
-
-With the advanced indexing syntax, a MIDict with 2 indices
-can be used as a normal dict, as well as a convenient
-**bidirectional dict** to index using either a key or a value::
-
-    mi_dict = MIDict(jack=1, tony=2)
-
-* Forward indexing (``d[key] -> value``, like a normal dict)::
-
-      mi_dict['jack'] -> 1
-      <==> mi_dict[0:'jack', 1]
-
-* Backward indexing (``d[:value] -> key``)::
-
-      mi_dict[:1] -> 'jack'
-      <==> mi_dict[-1:1, 0]
+    mi_dict == MIDict(normal_dict) # True
+    normal_dict == dict(mi_dict) # True
+    normal_dict == mi_dict.todict() # True
 
 
 Attributes as keys
@@ -178,7 +188,7 @@ keys and values.
 
 Additional APIs to handle indices
 ---------------------------------
-MIDict provides handy APIs (``d.reorder_indices()``, ``d.rename_index()``,
+MIDict provides special methods (``d.reorder_indices()``, ``d.rename_index()``,
 ``d.add_index()``, ``d.remove_index()``) to handle the indices::
 
     d = MIDict([['jack', 1], ['tony', 2]], ['name', 'uid'])
@@ -192,9 +202,9 @@ MIDict provides handy APIs (``d.reorder_indices()``, ``d.rename_index()``,
     <==> d.rename_index(['name', 'userid']) # rename all indices
     d -> MIDict([['jack', 1], ['tony', 2]], ['name', 'userid'])
 
-    d.add_index(items=['192.1', '192.2'], name='ip')
+    d.add_index(values=['192.1', '192.2'], name='ip')
     d -> MIDict([['jack', 1, '192.1'], ['tony', 2, '192.2']],
-                        ['name', 'userid', 'ip'])
+                ['name', 'userid', 'ip'])
 
     d.remove_index('userid')
     d -> MIDict([['jack', '192.1'], ['tony', '192.2']], ['name', 'ip'])
@@ -209,7 +219,8 @@ The elements in each index of MIDict should be unique.
 
 When setting an item using syntax ``d[index1:key, index2] = value2``,
 if ``key`` already exists in ``index1``, the item of ``key`` will be updated
-according to ``index2`` and ``value2``. However, if any value of ``value2``
+according to ``index2`` and ``value2`` (similar to updating the value of a key in
+a normal ``dict``). However, if any value of ``value2``
 already exists in ``index2``, a ``ValueExistsError`` will be raised.
 
 When constructing a MIDict or updating it with ``d.update()``,
@@ -224,10 +235,11 @@ the first index treated as ``index1`` and the rest indices treated as ``index2``
     d['alice'] = 2 # raise ValueExistsError
     d[:2] = 'jack' # raise ValueExistsError
     d['jack', :] = ['tony', 22] # raise ValueExistsError
-    d['jack', :] = ['jack2', 11] # replace item of key 'jack'
+    d['jack', :] = ['jack2', 11] # replace key 'jack' to a new key 'jack2' and value to 11
 
     d.update([['alice', 2]]) # raise ValueExistsError
     d.update(alice=2) # raise ValueExistsError
+    d.update(alice=4) # add new key/value
 
     MIDict([['jack',1]], jack=2) # {'jack': 2}
     MIDict([['jack',1], ['jack',2]]) # {'jack': 2}
@@ -238,44 +250,48 @@ the first index treated as ``index1`` and the rest indices treated as ``index2``
 Internal data struture
 ----------------------
 
-Internally MIDict uses a 3-level ordered dicts ``d.indices`` to store
-the items and indices and keep the order of them::
+Essentially ``MIDict`` is a ``Mapping`` type, and it stores the data in the form of
+``{key: value}`` for 2 indices (identical to a normal ``dict``) or
+``{key: list_of_values}`` for more than 2 indices.
+
+Additionally, MIDict uses a special attribute ``d.indices`` to store
+the indices, which is an ``IdxOrdDict`` instance with the index names as keys
+(the value of the first index is the ``MIDict`` instance itself, and the value of
+each other index is an ``AttrOrdDict`` instance which maps each element in that index
+to its corresponding element in the first index)::
 
     d = MIDict([['jack', 1], ['tony', 2]], ['name', 'uid'])
 
     d.indices ->
 
-    IdxOrdDict([
-        ('name', AttrOrdDict([
-            ('jack', IdxOrdDict([('name', 'jack'), ('uid', 1)])),
-            ('tony', IdxOrdDict([('name', 'tony'), ('uid', 2)])),
-        ])),
-        ('uid', AttrOrdDict([
-            (1, IdxOrdDict([('name', 'jack'), ('uid', 1)])),
-            (2, IdxOrdDict([('name', 'tony'), ('uid', 2)])),
-        ])),
-    ])
+        IdxOrdDict([
+            ('name', MIDict([('jack', 1), ('tony', 2)], ['name', 'uid'])),
+            ('uid', AttrOrdDict([(1, 'jack'), (2, 'tony')])),
+        ])
 
-``d.indices`` also presents an interface to access the indices and items::
+Thus, ``d.indices`` also presents an interface to access the indices and items.
+
+For example, access index names::
 
     'name' in d.indices -> True
     list(d.indices) -> ['name', 'uid']
     d.indices.keys() -> ['name', 'uid']
 
+Access items in an index::
 
     'jack' in d.indices['name'] -> True
+    1 in d.indices['uid'] -> True
     list(d.indices['name']) -> ['jack', 'tony']
+    list(d.indices['uid']) -> [1, 2]
     d.indices['name'].keys() -> ['jack', 'tony']
+    d.indices['uid'].keys() -> [1, 2]
 
-    d.indices['name'].values() -> [
-        IdxOrdDict([('name', 'jack'), ('uid', 1)]),
-        IdxOrdDict([('name', 'tony'), ('uid', 2)]),
-    ]
+``d.indices`` also supports the attribute syntax::
 
-    d.indices.name.jack.uid # -> 1
-    <==> d.indices['name']['jack']['uid']
+    d.indices.name -> MIDict([('jack', 1), ('tony', 2)], ['name', 'uid'])
+    d.indices.uid -> AttrOrdDict([(1, 'jack'), (2, 'tony')])
 
-However, users should not directly change the keys/values in ``d.indices``,
+However, the keys/values in ``d.indices`` should not be directly changed,
 otherwise the structure or the references may be broken.
 Use the methods of ``d`` rather than ``d.indices`` to operate the data.
 
@@ -342,12 +358,95 @@ More examples of advanced indexing
     user[1, 0:-1]               -> [1, 'jack']
     user[1, 'name':-1]          -> ['jack']
     user['uid':1, 'name','ip']  -> ['jack', '192.1']
-    user[0:3, ['name','ip']] = ['tom', '192.3'] # set a new item
+    user[0:3, ['name','ip']] = ['tom', '192.3'] # set a new item explictly
+    <==> user[0:3] = ['tom', '192.3'] # set a new item implicitly
     # result:
     # user -> MIDict([[1, 'jack', '192.1'],
                       [2, 'tony', '192.2'],
                       [3, 'tom', '192.3']],
                      ['uid', 'name', 'ip'])
+
+
+
+
+
+midict.FrozenMIDict
+-------------------
+
+An immutable, hashable multi-index dictionary (similar to ``MIDict``).
+
+
+midict.AttrDict
+---------------
+
+A dictionary that can get/set/delete a key using the attribute syntax
+if it is a valid Python identifier. (``d.key`` <==> d['key'])
+
+Note that it treats an attribute as a dictionary key only when it can not
+find a normal attribute with that name. Thus, it is the programmer's
+responsibility to choose the correct syntax while writing the code.
+
+Be aware that besides all the inherited attributes, AttrDict has an
+additional internal attribute "_AttrDict__attr2item".
+
+Examples::
+
+    d = AttrDict(__init__='value for key "__init__"')
+    d.__init__ -> <bound method AttrDict.__init__>
+    d["__init__"] -> 'value for key "__init__"'
+
+
+midict.IndexDict
+----------------
+
+A dictionary that supports flexible indexing (get/set/delete) of
+multiple keys via an int, tuple, list or slice object.
+
+The type of a valid key in IndexDict should not be int, tuple, or NoneType.
+
+To index one or more items, use a proper ``item`` argument with the
+bracket syntax: ``d[item]``. The possible types and contents of ``item``
+as well as the corresponding values are summarized as follows:
+
+============= ================================== ======================
+    type        content of the ``item`` argument    corresponding values
+============= ================================== ======================
+int           the index of a key in d.keys()     the value of the key
+tuple/list    multiple keys or indices of keys   list of values
+slice         "key_start : key_stop : step"      list of values
+other types   a normal key                       the value of the key
+============= ================================== ======================
+
+The tuple/list syntax can mix keys with indices of keys.
+
+The slice syntax means a range of keys (like the normal list slicing),
+and the ``key_start`` and ``key_stop`` parameter can be a key, the index
+of a key, or None (which can be omitted).
+
+When setting items, the slice and int syntax (including int in the tuple/list
+syntax) can only be used to change values of existing keys, rather than
+set values for new keys.
+
+
+Examples::
+
+    d = IndexDict(a=1,b=2,c=3)
+
+    d -> {'a': 1, 'c': 3, 'b': 2}
+    d.keys() -> ['a', 'c', 'b']
+
+    d['a'] -> 1
+    d[0] -> 1
+    d['a','b'] <==> d[('a','b')] <==> d[['a','b']] -> [1, 2]
+    d[:] -> [1,3,2]
+    d['a':'b'] <==> d[0:2] <==> d['a':2] <==> d['a':-1] -> [1, 3]
+    d[0::2] -> [1, 2]
+
+    d[0] = 10 # d -> {'a': 10, 'c': 3, 'b': 2}
+    d['a':-1] = [10, 30] # d -> {'a': 10, 'c': 30, 'b': 2}
+
+    d[5] = 10 -> KeyError: 'Index out of range of keys: 5'
+
 
 
 ---------

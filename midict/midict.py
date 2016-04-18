@@ -72,6 +72,10 @@ def od_reorder_keys(od, keys_in_new_order):
     return od
 
 
+#==============================================================================
+# AttrDict
+#==============================================================================
+
 class AttrDict(dict):
     '''
     A dictionary that can get/set/delete a key using the attribute syntax
@@ -84,7 +88,7 @@ class AttrDict(dict):
     Be aware that besides all the inherited attributes, AttrDict has an
     additional internal attribute "_AttrDict__attr2item".
 
-    Example::
+    Examples::
 
         d = AttrDict(__init__='value for key "__init__"')
         d.__init__ -> <bound method AttrDict.__init__>
@@ -161,48 +165,41 @@ def convert_dict(d, cls=AttrDict):
 
 
 
-def _index_to_key(keys, index):
-    'Convert int ``index`` to the corresponding key in ``keys``'
-    if isinstance(index, int):
-        try:
-            return keys[index]
-        except IndexError:
-            # use KeyError rather than IndexError for compatibility
-            #            IndexNotExistsError()
-            raise KeyError('Index out of range of keys: %s' % (index,))
-    return index
+#==============================================================================
+# IndexDict
+#==============================================================================
 
 
-def _key_to_index(keys, key, single=False):
-    'convert `key` to int or list of int'
+def _key_to_index(keys, key, single_only=False):
+    'convert ``key`` of various types to int or list of int'
     if isinstance(key, int): # validate the int index
         try:
             keys[key]
         except IndexError:
             raise KeyError('Index out range of keys: %s' % (key,))
         if key < 0:
-            key += len(keys)
+            key += len(keys) # always positive index
         return key
 #    keys = d.keys()
-    if not single:
+    if not single_only:
         if isinstance(key, (tuple, list)):
             return [_key_to_index_single(keys, k) for k in key]
 
         if isinstance(key, slice):
             start, stop, step = key.start, key.stop, key.step
             try:
-                _check_index_name(start)
+                MI_check_index_name(start)
                 start = keys.index(start)
             except TypeError:
                 pass
             try:
-                _check_index_name(stop)
+                MI_check_index_name(stop)
                 stop = keys.index(stop)
             except TypeError:
                 pass
 #            return slice(start, stop, step)
             args = slice(start, stop, step).indices(len(keys))
-            return range(*args)
+            return range(*args) # list of indices
     try:
         return keys.index(key)
     except IndexError:
@@ -210,27 +207,50 @@ def _key_to_index(keys, key, single=False):
 
 
 def _key_to_index_single(keys, key):
-    return _key_to_index(keys, key, single=True)
+    return _key_to_index(keys, key, single_only=True)
 
 
-def convert_index_keys(d, item):
+def convert_key_to_index(keys, key):
+    '''
+    convert ``key`` of various types to int or list of int
+
+    return index, single
+    '''
+    index = _key_to_index(keys, key)
+    single = isinstance(index, int)
+    return index, single
+
+
+def _int_to_key(keys, index):
+    'Convert int ``index`` to the corresponding key in ``keys``'
+    if isinstance(index, int):
+        try:
+            return keys[index]
+        except IndexError:
+            # use KeyError rather than IndexError for compatibility
+            raise KeyError('Index out of range of keys: %s' % (index,))
+    return index
+
+
+def convert_index_to_keys(d, item):
     # use a separate function rather than a method inside the class IndexDict
     '''
-    Convert ``item`` in various types to a single key or a list of keys.
+    Convert ``item`` in various types (int, tuple/list, slice, or a normal key)
+    to a single key or a list of keys.
     '''
 
     keys = d.keys()
     # use KeyError for compatibility of normal use
 
-    # int item will be interpreted as the index rather than key!!
+    # Warning: int item will be interpreted as the index rather than key!!
     if isinstance(item, int):
-        item = _index_to_key(keys, item)
+        item = _int_to_key(keys, item)
         single = True
 
     elif isinstance(item, (tuple, list)):
         item2 = []
         for i in item:
-            i = _index_to_key(keys, i)
+            i = _int_to_key(keys, i)
             item2.append(i)
         item = item2
         single = False
@@ -257,7 +277,7 @@ def convert_index_keys(d, item):
     return item, single
 
 
-def _check_IndexDict_key(key):
+def IndexDict_check_key_type(key):
     'raise TypeError if ``key`` is int, tuple or NoneType'
     if isinstance(key, (int, tuple, NoneType)):
         raise TypeError('Key must not be int or tuple or None: %s' % (key,))
@@ -294,31 +314,31 @@ class IndexDict(dict):
     set values for new keys.
 
 
-    Examples:
+    Examples::
 
-    d = IndexDict(a=1,b=2,c=3)
+        d = IndexDict(a=1,b=2,c=3)
 
-    d -> {'a': 1, 'c': 3, 'b': 2}
-    d.keys() -> ['a', 'c', 'b']
+        d -> {'a': 1, 'c': 3, 'b': 2}
+        d.keys() -> ['a', 'c', 'b']
 
-    d['a'] -> 1
-    d[0] -> 1
-    d['a','b'] <==> d[('a','b')] <==> d[['a','b']] -> [1, 2]
-    d[:] -> [1,3,2]
-    d['a':'b'] <==> d[0:2] <==> d['a':2] <==> d['a':-1] -> [1, 3]
-    d[0::2] -> [1, 2]
+        d['a'] -> 1
+        d[0] -> 1
+        d['a','b'] <==> d[('a','b')] <==> d[['a','b']] -> [1, 2]
+        d[:] -> [1,3,2]
+        d['a':'b'] <==> d[0:2] <==> d['a':2] <==> d['a':-1] -> [1, 3]
+        d[0::2] -> [1, 2]
 
-    d[0] = 10 # d -> {'a': 10, 'c': 3, 'b': 2}
-    d['a':-1] = [10, 30] # d -> {'a': 10, 'c': 30, 'b': 2}
+        d[0] = 10 # d -> {'a': 10, 'c': 3, 'b': 2}
+        d['a':-1] = [10, 30] # d -> {'a': 10, 'c': 30, 'b': 2}
 
-    d[5] = 10 -> KeyError: 'Index out of range of keys: 5'
+        d[5] = 10 -> KeyError: 'Index out of range of keys: 5'
     '''
 
     def __init__(self, *args, **kw):
         'check key is valid'
         if args:
             for key, value in args[0]:
-                _check_IndexDict_key(key)
+                IndexDict_check_key_type(key)
         super(IndexDict, self).__init__(*args, **kw)
 
 #
@@ -327,7 +347,7 @@ class IndexDict(dict):
         '''
         Get one or more items using flexible indexing.
         '''
-        item2, single = convert_index_keys(self, item)
+        item2, single = convert_index_to_keys(self, item)
         super_getitem = super(IndexDict, self).__getitem__
         if single:
             return super_getitem(item2)
@@ -342,7 +362,7 @@ class IndexDict(dict):
         only be used to change values of existing keys, rather than set values
         for new keys.
         '''
-        item2, single = convert_index_keys(self, item)
+        item2, single = convert_index_to_keys(self, item)
         super_setitem = super(IndexDict, self).__setitem__
         if single:
             super_setitem(item2, value)
@@ -351,14 +371,14 @@ class IndexDict(dict):
                 raise ValueError(
                     'Number of keys (%s) based on argument %s does not match '
                     'number of values (%s)' % (len(item2), item, len(value)))
-            map(_check_IndexDict_key, item2)
+            map(IndexDict_check_key_type, item2)
             return map(super_setitem, item2, value)
 
     def __delitem__(self, item):
         '''
         Delete one or more items using flexible indexing.
         '''
-        item2, single = convert_index_keys(self, item)
+        item2, single = convert_index_to_keys(self, item)
         super_delitem = super(IndexDict, self).__delitem__
         if single:
             return super_delitem(item2)
@@ -382,14 +402,40 @@ class IdxOrdDict(IndexDict, AttrDict, OrderedDict):
     pass
 
 
-def _check_index_name(name):
-    'Check if index name is valid'
+#==============================================================================
+# MIMapping
+#==============================================================================
+
+
+class MIMappingError(Exception):
+    'Base class for MIDict exceptions'
+    pass
+
+
+class ValueExistsError(KeyError, MIMappingError):
+    '''
+    Value already exists in an index and can not be used as a key.
+
+    Usage::
+
+        ValueExistsException(value, index_order, index_name)
+    '''
+
+    def __str__(self):
+        """Get a string representation of this exception for use with str."""
+        return 'Value {0!r} already exists in index #{1}: {2!r}'.format(*self.args)
+
+
+#==============================================================================
+
+def MI_check_index_name(name):
+    'Check if index name is a valid str or unicode'
     if not isinstance(name, (str, unicode)):
         raise TypeError('Index name must be a str or unicode. '
                         'Found type %s for %s' % (type(name), name))
 
 
-def _get_unique_name(name, collection):
+def get_unique_name(name, collection):
     '''
     Generate a unique name by appending a sequence number to
     the original name so that it is not contained in the collection.
@@ -405,8 +451,12 @@ def _get_unique_name(name, collection):
             return name2
 
 
-def _get_value_len(value):
-    'Get length of value. if value has no len(), convert it to list first'
+def get_value_len(value):
+    '''
+    Get length of ``value``. If ``value`` (eg, iterator) has no len(), convert it to list first.
+
+    return both length and converted value.
+    '''
     try:
         Nvalue = len(value)
     except TypeError:
@@ -416,7 +466,7 @@ def _get_value_len(value):
     return Nvalue, value
 
 
-def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
+def MI_parse_args(self, args, ingore_index2=False, allow_new=False):
     '''
     Parse the arguments for indexing in MIDict.
 
@@ -459,6 +509,7 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
                     index2 = args[1:]
                 break
 
+            # args[0] is not a slice
             if Nargs > 1 and isinstance(args[1], (list, slice)):
                 key, index2 = args
                 break
@@ -471,7 +522,7 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
     else:
         key = args
 
-    if empty:
+    if empty: # allow_new is True
         index1_last = False
 
         exist_names = []  # list of names already passed in as arguments
@@ -483,17 +534,17 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
                 raise TypeError('Index1 can not be int when dictionary '
                                 'is empty: %s' % (index1,))
             else:
-                _check_index_name(index1)
+                MI_check_index_name(index1)
                 exist_names.append(index1)
         if index2 is not _default:
             if isinstance(index2, (tuple, list)):
-                map(_check_index_name, index2)
+                map(MI_check_index_name, index2)
                 exist_names.extend(index2)
             elif isinstance(index2, (int, slice)):
                 raise TypeError('Index2 can not be int or slice when '
                                 'dictionary is empty: %s' % (index2,))
             else:
-                _check_index_name(index2)
+                MI_check_index_name(index2)
                 exist_names.append(index2)
 
         # auto generate index names and avoid conficts with existing names
@@ -505,12 +556,12 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
                     name1 = 'index_2'
             else:
                 name1 = 'index_1'
-            index1 = _get_unique_name(name1, exist_names)
+            index1 = get_unique_name(name1, exist_names)
             exist_names.append(index1)
 
         if index2 is _default:
             name2 = 'index_1' if index1_last else 'index_2'
-            index2 = _get_unique_name(name2, exist_names)
+            index2 = get_unique_name(name2, exist_names)
 
         return index1, key, index2, index1_last
 
@@ -525,7 +576,7 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
     index1 = _key_to_index_single(names, index1)
 
     try:
-        item = mid_get_item(self, key, index1)
+        item = MI_get_item(self, key, index1)
     except KeyError:
         if allow_new:  # new key for setitem; item_d = None
             item = None
@@ -548,7 +599,7 @@ def mid_parse_args(self, args, ingore_index2=False, allow_new=False):
         # index2 is always returned as int or list of int
         index2 = _key_to_index(names, index2)
 
-    if item is None:  # allow_new
+    if item is None:  # allow_new. item and value are None
         return index1, key, index2, None, None
 
     try:
@@ -574,7 +625,7 @@ def mset_list(item, index, value):
         return map(item.__setitem__, index, value)
 
 
-def mid_get_item(self, key, index=0):
+def MI_get_item(self, key, index=0):
     'return list of item'
     index = _key_to_index_single(self.indices.keys(), index)
     if index != 0:
@@ -590,21 +641,21 @@ def mid_get_item(self, key, index=0):
     return [key] + value
 
 
-def _mid_setitem(self, args, value):
+def _MI_setitem(self, args, value):
     'Separate __setitem__ function of MIMapping'
     indices = self.indices
     N = len(indices)
     empty = N == 0
-    if empty:
-        index1, key, index2, index1_last = mid_parse_args(self, args, allow_new=True)
+    if empty: # init the dict
+        index1, key, index2, index1_last = MI_parse_args(self, args, allow_new=True)
         exist_names = [index1]
         item = [key]
         try:
-            _check_index_name(index2)
+            MI_check_index_name(index2)
             exist_names.append(index2)
             item.append(value)
         except TypeError:
-            Nvalue, value = _get_value_len(value)
+            Nvalue, value = get_value_len(value)
             if len(index2) != Nvalue:
                 raise ValueError(
                     'Number of keys (%s) based on argument %s does not match '
@@ -615,10 +666,10 @@ def _mid_setitem(self, args, value):
             exist_names = exist_names[1:] + exist_names[:1]
             item = item[1:] + item[:1]
 
-        _mid_init(self, [item], exist_names)
+        _MI_init(self, [item], exist_names)
         return
 
-    index1, key, index2, item, old_value = mid_parse_args(self, args, allow_new=True)
+    index1, key, index2, item, old_value = MI_parse_args(self, args, allow_new=True)
     names = indices.keys()
     is_new_key = item is None
     single = isinstance(index2, int)
@@ -629,7 +680,7 @@ def _mid_setitem(self, args, value):
         old_value = [old_value]
     else:
         index2_list = index2
-        Nvalue, value = _get_value_len(value)
+        Nvalue, value = get_value_len(value)
         if len(index2_list) != Nvalue:
             raise ValueError('Number of keys (%s) based on argument %s does not match '
                              'number of values (%s)' % (len(index2_list), index2, Nvalue))
@@ -651,9 +702,9 @@ def _mid_setitem(self, args, value):
         # index2_list may contain index1; not allow duplicate value for index1 either
         if v in indices[i]:
             if is_new_key or v != old_v:
-                raise ValueExistsError(v, i)
+                raise ValueExistsError(v, i, names[i])
 
-    if is_new_key:  # new key
+    if is_new_key:
         if set(index2_list + [index1]) != set(range(N)):
             raise ValueError('Indices of the new item do not match existing indices')
 
@@ -668,10 +719,10 @@ def _mid_setitem(self, args, value):
         for i, v in zip(names[1:], values[1:]):
             indices[i][v] = key
 
-    else:
+    else: # not new key
         key1 = item[0]
         item2 = list(item)  # copy item first
-        mset_list(item2, index2_list, value)
+        mset_list(item2, index2_list, value) # index2_list may also override index1
         key2 = item2[0]
         val = item2[1] if len(item2) == 2 else item2[1:]
         if key1 == key2:
@@ -683,7 +734,7 @@ def _mid_setitem(self, args, value):
             od_replace_key(indices[i], v_old, v_new, key2)
 
 
-def _mid_init(self, *args, **kw):
+def _MI_init(self, *args, **kw):
     '''
     Separate __init__ function of MIMapping
     '''
@@ -742,15 +793,12 @@ def _mid_init(self, *args, **kw):
     if names is None:  # generate default names
         names = ['index_' + str(i) for i in range(n_index)]
     else:
-        for name in names:
-            if not isinstance(name, (str, unicode)):
-                raise TypeError('Index name must be a str or unicode. '
-                                'found type %s for %s' % (type(name), name))
+        map(MI_check_index_name, names)
 
-    d = self.indices = IdxOrdDict() # the internal dict
+    self.indices = d = IdxOrdDict() # the internal dict
     for index in names:
         if index in d:
-            raise ValueError('Duplicate index name: %s' % (index,))
+            raise ValueError('Duplicate index name: %s in %s' % (index, names))
         d[index] = AttrOrdDict()
 
     if n_index > 0:
@@ -762,9 +810,9 @@ def _mid_init(self, *args, **kw):
             elif n_index == 2:
                 value = item[1]
             else:
-                value = list(item[1:])
+                value = list(item[1:]) # copy
             # will handle duplicate
-            _mid_setitem(self, primary_key, value)
+            _MI_setitem(self, primary_key, value)
 
 
 class MIMapping(AttrOrdDict):
@@ -792,7 +840,7 @@ class MIMapping(AttrOrdDict):
         When keyword arguments present, only two indices allowed (like a normal dict)
 
 
-        Example:
+        Examples:
 
             index_names = ['uid', 'name', 'ip']
             rows_of_data = [[1, 'jack', '192.1'],
@@ -818,7 +866,7 @@ class MIMapping(AttrOrdDict):
 
         super(MIMapping, self).__init__()
 
-        _mid_init(self, *args, **kw)
+        _MI_init(self, *args, **kw)
 
 
     def __getitem__(self, args):
@@ -826,7 +874,7 @@ class MIMapping(AttrOrdDict):
         get values via multi-indexing
         '''
 
-        return mid_parse_args(self, args)[-1]
+        return MI_parse_args(self, args)[-1]
 
     def __setitem__(self, args, value):
         '''
@@ -847,7 +895,7 @@ class MIMapping(AttrOrdDict):
 
     def __eq__(self, other):
         """
-        Test for equality with *other*.
+        Test for equality with ``other``.
 
         if ``other`` is a regular mapping/dict, compare only order-insensitive keys/values.
         if ``other`` is also a OrderedDict, also compare the order of keys.
@@ -857,22 +905,15 @@ class MIMapping(AttrOrdDict):
         if not isinstance(other, Mapping):
             return NotImplemented
 
+        eq = super(MIMapping, self).__eq__(other)
+
+        if not eq:
+            return False
+
         if isinstance(other, MIMapping):
-            return (super(MIMapping, self).__eq__(other) and
-                self.indices.keys() == other.indices.keys())
-        # other Mapping types
+            eq = self.indices.keys() == other.indices.keys()
 
-        if len(self) != len(other):
-            return False
-        # equal length
-
-        if len(self.indices) == 0:  # empty index names, empty items
-            return True
-
-        if len(self.indices) != 2:
-            return False
-
-        return super(MIMapping, self).__eq__(other) # ignore indices
+        return eq # ignore indices
 
 #    def __ne__(self, other): # inherited from OrderedDict
 #        return not self == other
@@ -884,30 +925,23 @@ class MIMapping(AttrOrdDict):
         If ``other`` is not a Mapping type, return NotImplemented.
 
         If ``other`` is a Mapping type, compare in the following order:
-            * length of items
-            * length of indices
             * convert ``self`` to an OrderedDict or a dict (depends on the type of ``other``)
               and compare it with ``other``
-            * index names (only if ``other`` is a MIDict)
+            * index names (only if ``other`` is a MIMapping)
 
         '''
         if not isinstance(other, Mapping):
             return NotImplemented
 
-        if isinstance(other, MIMapping):
-            return (super(MIMapping, self).__lt__(other) and
-                self.indices.keys() < other.indices.keys())
+        lt = super(MIMapping, self).__eq__(other)
 
-        len_other_indices = 2 if len(other) else 0
-
-        diff = len(self.indices) - len_other_indices
-        if diff < 0:
-            return True
-        elif diff > 0:
+        if not lt:
             return False
-        # equal indices length
 
-        return super(MIMapping, self).__lt__(other) # ignore indices
+        if isinstance(other, MIMapping):
+            lt = self.indices.keys() < other.indices.keys()
+
+        return lt
 
     # use __lt__
 
@@ -950,10 +984,15 @@ class MIMapping(AttrOrdDict):
 
     def __reduce__(self):
         'Return state information for pickling'
-        return self.__class__, (), self.__dict__
+        items = self.items()
+        names = self.indices.keys()
+        inst_dict = vars(self).copy() # additional state/__dict__
+        for k in vars(self.__class__()):
+            inst_dict.pop(k, None)
+        return self.__class__, (items, names), inst_dict
 
     def copy(self):
-        'od.copy() -> a shallow copy of od'
+        'a shallow copy'
         return self.__class__(self)
 
 #    def __sizeof__(self):
@@ -997,7 +1036,7 @@ class MIMapping(AttrOrdDict):
         try:
             return self[key]
         except KeyError:
-            return None
+            return default
 
     def __contains__(self, key):
         '''
@@ -1006,9 +1045,9 @@ class MIMapping(AttrOrdDict):
         Support "multi-indexing" keys
         '''
         try:
-            mid_parse_args(self, key, ingore_index2=True, allow_new=False)
+            MI_parse_args(self, key, ingore_index2=True, allow_new=False)
             return True
-        except KeyError:
+        except Exception:
             return False
 
     def has_key(self, key):
@@ -1023,7 +1062,7 @@ class MIMapping(AttrOrdDict):
     ############################################
 
     # inherited methods from OrderedDict:
-    # copy, pop, popitem, setdefault
+    # pop, popitem, setdefault
 
     def __iter__(self, index=None):
         'Return an iterator through keys in the ``index`` (defaults to the first index)'
@@ -1051,10 +1090,9 @@ class MIMapping(AttrOrdDict):
                 index = 0
             if index == 0:
                 # use super otherwise infinite loop of __iter__
-                return super(MIMapping, self).__reversed__()
+                return super(MIMapping, self).__reversed__() # from OrderedDict
             else: # OrderedDict reverse
                 return reversed(self.indices[index])
-
         else:
             if index is None:
                 return iter(())
@@ -1089,18 +1127,20 @@ class MIMapping(AttrOrdDict):
                 return
             elif N == 2:
                 index = 1
+                single = True
             else:
                 index = slice(1, None)
+                single = False
         else:
-            index = _key_to_index(self.indices.keys(), index)
+            index, single = convert_key_to_index(self.indices.keys(), index)
 
-        multi = not isinstance(index, int)
+        multi = not single
 
         for key in self:
-            item = mid_get_item(self, key)
+            item = MI_get_item(self, key)
             value = mget_list(item, index)
             if multi:
-                value = tuple(value)  # convert to tuple
+                value = tuple(value)  # convert list to tuple
             yield value
 
     def values(self, index=None):
@@ -1161,7 +1201,9 @@ class MIMapping(AttrOrdDict):
 
 class MIDict(MIMapping):
     '''
-    A multi-index dictionary (MIDict) with flexible multi-item indexing syntax.
+    A multi-index dictionary (MIDict) allowing any index as the "keys" or "values"
+    (suitable for bidirectional/inverse dict) with powerful indexing syntax to
+    assess multiple values.
 
     Multiple indices
     ----------------
@@ -1177,18 +1219,22 @@ class MIDict(MIMapping):
     +---------+---------+---------+
 
     In each index (i.e., column), elements are unique and hashable (suitable
-    for dict keys).
+    for dict keys). Here, a "super dict" is wanted to represent this table
+    which allows any index (column) to be used as the "keys" to index the table.
+    Such a "super dict" is called a multi-index dictionary (MIDict).
 
-    A multi-index ``user`` dictionary can be constructed with two arguments:
-    a list of items (rows of data), and a list of index names::
+    A multi-index dictionary ``user`` can be constructed with two arguments:
+    a list of items (rows of data), and a list of index names:
+
+    .. code-block:: python
 
         user = MIDict([['jack', 1, '192.1'],
                        ['tony', 2, '192.2']],
                       ['name', 'uid', 'ip'])
 
     Index names are for easy human understanding and indexing, and thus
-    must be ``str`` or ``unicode`` type. The indices (and items) are ordered
-    in the dictionary. Compatible with a normal dict, the first index (column)
+    must be a ``str`` (or ``unicode``) type. The index names and items are ordered
+    in the dictionary. Compatible with a normal ``dict``, the first index (column)
     is the primary index to lookup/index a key, while the rest index or indices
     contain the corresponding key's value or list of values::
 
@@ -1203,9 +1249,9 @@ class MIDict(MIMapping):
         user['ip':'192.1', 'name'] -> 'jack'
 
     Here, ``index1`` is the single column used as the "keys", and ``key`` is
-    an element in ``index1`` to locate the row of record in the table.
-    ``index2`` can be one or more columns to specify the value(s) from the row
-    of record.
+    an element in ``index1`` to locate the row of record (e.g.,
+    ``['jack', 1, '192.1']``) in the table. ``index2`` can be one or more columns
+    to specify the value(s) from the row of record.
 
 
     Multi-item indexing
@@ -1215,8 +1261,10 @@ class MIDict(MIMapping):
     columns/indices at the same time.
 
     In the indexing syntax ``d[index1:key, index2]``, both ``index1`` and
-    ``index2`` support flexible indexing using an int, tuple, list or slice
-    object, which means (see ``IndexDict`` for more details)::
+    ``index2`` support flexible indexing using a normal key or an ``int``,
+    and ``index2`` can also be a ``tuple``, ``list`` or ``slice`` object
+    to specify multiple columns/indices, with the following meanings
+    (see ``IndexDict`` for more details)::
 
         int -> the index of a key in d.keys()
         tuple/list -> multiple keys or indices of keys or mixture
@@ -1250,6 +1298,26 @@ class MIDict(MIMapping):
         user['jack', :] -> ['jack', 1, '192.1']
 
 
+    Bidirectional/inverse dict
+    --------------------------
+
+    With the advanced indexing syntax, a MIDict with 2 indices
+    can be used as a normal dict, as well as a convenient
+    **bidirectional dict** to index using either a key or a value::
+
+        mi_dict = MIDict(jack=1, tony=2)
+
+    * Forward indexing like a normal dict (``d[key] -> value``)::
+
+          mi_dict['jack'] -> 1
+          <==> mi_dict[0:'jack', 1]
+
+    * Backward/inverse indexing using the slice syntax (``d[:value] -> key``)::
+
+          mi_dict[:1] -> 'jack'
+          <==> mi_dict[-1:1, 0]
+
+
     Compatible with normal dict
     ---------------------------
 
@@ -1258,37 +1326,19 @@ class MIDict(MIMapping):
 
         normal_dict = dict(jack=1, tony=2)
         mi_dict = MIDict(jack=1, tony=2)
-        <==> mi_dict = MIDict(normal_dict)
 
-        normal_dict -> {'tony': 2, 'jack': 1}
-        mi_dict -> MIDict([['tony', 2], ['jack', 1]], ['index_0', 'index_1'])
-
-        # the following equality checks all return True:
+    The following equality checks all return ``True``::
 
         mi_dict == normal_dict
         normal_dict['jack'] == mi_dict['jack'] == 1
         normal_dict.keys() == mi_dict.keys() == ['tony', 'jack']
         normal_dict.values() == mi_dict.values() == [2, 1]
 
+    Conversion between ``MIDict`` and ``dict`` is supported in both directions::
 
-    Bidirectional dict
-    ------------------
-
-    With the advanced indexing syntax, a MIDict with 2 indices
-    can be used as a normal dict, as well as a convenient
-    **bidirectional dict** to index using either a key or a value::
-
-        mi_dict = MIDict(jack=1, tony=2)
-
-    * Forward indexing (``d[key] -> value``, like a normal dict)::
-
-          mi_dict['jack'] -> 1
-          <==> mi_dict[0:'jack', 1]
-
-    * Backward indexing (``d[:value] -> key``)::
-
-          mi_dict[:1] -> 'jack'
-          <==> mi_dict[-1:1, 0]
+        mi_dict == MIDict(normal_dict) # True
+        normal_dict == dict(mi_dict) # True
+        normal_dict == mi_dict.todict() # True
 
 
     Attributes as keys
@@ -1337,7 +1387,7 @@ class MIDict(MIMapping):
 
     Additional APIs to handle indices
     ---------------------------------
-    MIDict provides handy APIs (``d.reorder_indices()``, ``d.rename_index()``,
+    MIDict provides special methods (``d.reorder_indices()``, ``d.rename_index()``,
     ``d.add_index()``, ``d.remove_index()``) to handle the indices::
 
         d = MIDict([['jack', 1], ['tony', 2]], ['name', 'uid'])
@@ -1368,7 +1418,8 @@ class MIDict(MIMapping):
 
     When setting an item using syntax ``d[index1:key, index2] = value2``,
     if ``key`` already exists in ``index1``, the item of ``key`` will be updated
-    according to ``index2`` and ``value2``. However, if any value of ``value2``
+    according to ``index2`` and ``value2`` (similar to updating the value of a key in
+    a normal ``dict``). However, if any value of ``value2``
     already exists in ``index2``, a ``ValueExistsError`` will be raised.
 
     When constructing a MIDict or updating it with ``d.update()``,
@@ -1383,7 +1434,7 @@ class MIDict(MIMapping):
         d['alice'] = 2 # raise ValueExistsError
         d[:2] = 'jack' # raise ValueExistsError
         d['jack', :] = ['tony', 22] # raise ValueExistsError
-        d['jack', :] = ['jack2', 11] # replace item of key 'jack'
+        d['jack', :] = ['jack2', 11] # replace key 'jack' to a new key 'jack2' and value to 11
 
         d.update([['alice', 2]]) # raise ValueExistsError
         d.update(alice=2) # raise ValueExistsError
@@ -1398,44 +1449,48 @@ class MIDict(MIMapping):
     Internal data struture
     ----------------------
 
-    Internally MIDict uses a 3-level ordered dicts ``d.indices`` to store
-    the items and indices and keep the order of them::
+    Essentially ``MIDict`` is a ``Mapping`` type, and it stores the data in the form of
+    ``{key: value}`` for 2 indices (identical to a normal ``dict``) or
+    ``{key: list_of_values}`` for more than 2 indices.
+
+    Additionally, MIDict uses a special attribute ``d.indices`` to store
+    the indices, which is an ``IdxOrdDict`` instance with the index names as keys
+    (the value of the first index is the ``MIDict`` instance itself, and the value of
+    each other index is an ``AttrOrdDict`` instance which maps each element in that index
+    to its corresponding element in the first index)::
 
         d = MIDict([['jack', 1], ['tony', 2]], ['name', 'uid'])
 
         d.indices ->
 
-        IdxOrdDict([
-            ('name', AttrOrdDict([
-                ('jack', IdxOrdDict([('name', 'jack'), ('uid', 1)])),
-                ('tony', IdxOrdDict([('name', 'tony'), ('uid', 2)])),
-            ])),
-            ('uid', AttrOrdDict([
-                (1, IdxOrdDict([('name', 'jack'), ('uid', 1)])),
-                (2, IdxOrdDict([('name', 'tony'), ('uid', 2)])),
-            ])),
-        ])
+            IdxOrdDict([
+                ('name', MIDict([('jack', 1), ('tony', 2)], ['name', 'uid'])),
+                ('uid', AttrOrdDict([(1, 'jack'), (2, 'tony')])),
+            ])
 
-    ``d.indices`` also presents an interface to access the indices and items::
+    Thus, ``d.indices`` also presents an interface to access the indices and items.
+
+    For example, access index names::
 
         'name' in d.indices -> True
         list(d.indices) -> ['name', 'uid']
         d.indices.keys() -> ['name', 'uid']
 
+    Access items in an index::
 
         'jack' in d.indices['name'] -> True
+        1 in d.indices['uid'] -> True
         list(d.indices['name']) -> ['jack', 'tony']
+        list(d.indices['uid']) -> [1, 2]
         d.indices['name'].keys() -> ['jack', 'tony']
+        d.indices['uid'].keys() -> [1, 2]
 
-        d.indices['name'].values() -> [
-            IdxOrdDict([('name', 'jack'), ('uid', 1)]),
-            IdxOrdDict([('name', 'tony'), ('uid', 2)]),
-        ]
+    ``d.indices`` also supports the attribute syntax::
 
-        d.indices.name.jack.uid # -> 1
-        <==> d.indices['name']['jack']['uid']
+        d.indices.name -> MIDict([('jack', 1), ('tony', 2)], ['name', 'uid'])
+        d.indices.uid -> AttrOrdDict([(1, 'jack'), (2, 'tony')])
 
-    However, users should not directly change the keys/values in ``d.indices``,
+    However, the keys/values in ``d.indices`` should not be directly changed,
     otherwise the structure or the references may be broken.
     Use the methods of ``d`` rather than ``d.indices`` to operate the data.
 
@@ -1502,7 +1557,8 @@ class MIDict(MIMapping):
         user[1, 0:-1]               -> [1, 'jack']
         user[1, 'name':-1]          -> ['jack']
         user['uid':1, 'name','ip']  -> ['jack', '192.1']
-        user[0:3, ['name','ip']] = ['tom', '192.3'] # set a new item
+        user[0:3, ['name','ip']] = ['tom', '192.3'] # set a new item explictly
+        <==> user[0:3] = ['tom', '192.3'] # set a new item implicitly
         # result:
         # user -> MIDict([[1, 'jack', '192.1'],
                           [2, 'tony', '192.2'],
@@ -1547,13 +1603,13 @@ class MIDict(MIMapping):
             d['jack', :] = ['jack2', 11] # replace item of key 'jack'
 
         '''
-        return _mid_setitem(self, args, value)
+        return _MI_setitem(self, args, value)
 
     def __delitem__(self, args):
         '''
         delete a key (and the whole item) via multi-indexing
         '''
-        item = mid_parse_args(self, args, ingore_index2=True)
+        item = MI_parse_args(self, args, ingore_index2=True)
         for i, v in enumerate(item):
             if i == 0:
                 super(MIMapping, self).__delitem__(v)
@@ -1585,7 +1641,7 @@ class MIDict(MIMapping):
                              'index names are already set.')
 
         if not self.indices:  # empty; init again
-            _mid_init(self, *args, **kw)
+            _MI_init(self, *args, **kw)
             return
 
         d = MIMapping(*args, **kw)
@@ -1649,7 +1705,7 @@ class MIDict(MIMapping):
             old_indices = self.indices.keys()
         else:
             old_indices, new_indices = args
-            old_indices, single = convert_index_keys(self.indices, old_indices)
+            old_indices, single = convert_index_to_keys(self.indices, old_indices)
             if single:
                 old_indices, new_indices = [old_indices], [new_indices]
 
@@ -1658,7 +1714,7 @@ class MIDict(MIMapping):
                              'existing indices (%s)' %
                              (len(new_indices), len(old_indices)))
 
-        map(_check_index_name, new_indices)
+        map(MI_check_index_name, new_indices)
 
         if len(new_indices) != len(set(new_indices)):
             raise ValueError('New indices names are not unique: %s' % (new_indices,))
@@ -1669,7 +1725,7 @@ class MIDict(MIMapping):
     def reorder_indices(self, indices_order):
         'reorder all the indices'
         # allow mixed index syntax like int
-        indices_order, single = convert_index_keys(self.indices, indices_order)
+        indices_order, single = convert_index_to_keys(self.indices, indices_order)
         old_indices = self.indices.keys()
 
         if indices_order == old_indices: # no changes
@@ -1686,7 +1742,7 @@ class MIDict(MIMapping):
         # reorder items
         items = [map(i.__getitem__, new_idx) for i in self.items()]
         self.clear(True)
-        _mid_init(self, items, indices_order)
+        _MI_init(self, items, indices_order)
 
 
     def add_index(self, values, name=None):
@@ -1701,9 +1757,9 @@ class MIDict(MIMapping):
 
         if name is None:
             name = 'index_' + str(len(d))
-            name = _get_unique_name(name, d)
+            name = get_unique_name(name, d)
         else:
-            _check_index_name(name)
+            MI_check_index_name(name)
             if name in d:
                 raise ValueError('Duplicate index name: %s' % (name,))
 
@@ -1715,7 +1771,7 @@ class MIDict(MIMapping):
         names = d.keys() + [name]
 
         self.clear(True)
-        _mid_init(self, items, names)
+        _MI_init(self, items, names)
 
 
     def remove_index(self, index):
@@ -1733,14 +1789,16 @@ class MIDict(MIMapping):
         names = mget_list(self.indices.keys(), index_new)
         items = [mget_list(i, index_new) for i in self.items()]
         self.clear(True)
-        _mid_init(self, items, names)
+        _MI_init(self, items, names)
 
 
 ############################################
 
 
 class FrozenMIDict(MIMapping, Hashable):
-    """Immutable, hashable multi-index dictionary"""
+    '''
+    An immutable, hashable multi-index dictionary (similar to ``MIDict``).
+    '''
 
     def __init__(self, *args, **kw):
         # set _hash as a normal attribute before init
@@ -1873,26 +1931,6 @@ class MIDictView(KeysView):
         return ('{0.__class__.__name__}({0._mapping!r}, index_key={0.index_key}, '
                 'index_value={0.index_value})').format(self)
 
-############################################
-
-
-class MIDictError(Exception):
-    'Base class for MIDict exceptions'
-    pass
-
-
-class ValueExistsError(KeyError, MIDictError):
-    '''
-    Value already exists in an index and can not be used as a key.
-
-    Usage::
-
-        ValueExistsException(value, index)
-    '''
-
-    def __str__(self):
-        """Get a string representation of this exception for use with str."""
-        return 'Value {0!r} exists in index {1!r}'.format(*self.args)
 
 ############################################
 
