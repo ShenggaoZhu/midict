@@ -97,7 +97,9 @@ class AttrDict(dict):
         so that these remain as normal attributes
         '''
         super(AttrDict, self).__init__(*args, **kw)
-        self.__attr2item = True  # transfered to _AttrDict__attr2item
+
+        # last line of code in __init__()
+        self.__attr2item = True # transfered to _AttrDict__attr2item
 
     # easy access of items through attributes, e.g., d.key
     def __getattr__(self, item):
@@ -140,6 +142,23 @@ class AttrDict(dict):
             super(AttrDict, self).__delattr__(item)
         else:
             self.__delitem__(item)
+
+
+
+def convert_dict(d, cls=AttrDict):
+    '''
+    recursively convert a normal Mapping `d` and it's values to a specified type
+    (defaults to AttrDict)
+    '''
+    for k, v in d.items():
+        if isinstance(v, Mapping):
+            d[k] = convert_dict(v)
+        elif isinstance(v, list):
+            for i, e in enumerate(v):
+                if isinstance(e, Mapping):
+                    v[i] = convert_dict(e)
+    return cls(d)
+
 
 
 def _index_to_key(keys, index):
