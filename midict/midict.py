@@ -933,7 +933,7 @@ class MIMapping(AttrOrdDict):
         if not isinstance(other, Mapping):
             return NotImplemented
 
-        lt = super(MIMapping, self).__eq__(other)
+        lt = super(MIMapping, self).__lt__(other)
 
         if not lt:
             return False
@@ -959,11 +959,10 @@ class MIMapping(AttrOrdDict):
 
     def __cmp__(self, other):
         'Return negative if self < other, zero if self == other, positive if self > other.'
-        if self < other:
-            return -1
-        if self == other:
-            return 0
-        return 1
+        # warning: "<" causes recursion of __cmp__
+#        if self < other:
+#            return -1
+        return NotImplemented
 
     def __repr__(self, _repr_running={}):
         'repr as "MIDict(items, names)"'
@@ -1935,7 +1934,7 @@ class MIDictView(KeysView):
 ############################################
 
 
-def test():
+def __test():
     m = IdxOrdDict(a=1, b=2)
     m['a'] = 10
     m['a', 'b'] = [10, 20]
