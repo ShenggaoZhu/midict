@@ -6,24 +6,90 @@ Created on Wed Apr 20 11:13:35 2016
 """
 #from __future__ import absolute_import
 import unittest
-from midict import *
+from collections import OrderedDict
+from midict.midict import *
 
+def call(obj, func_name, *args, **kw):
+    func = getattr(obj, func_name)
+    return func(*args, **kw)
 
 class TestMIDict_3(unittest.TestCase):
 
     def getData(self):
-        item1 = ['jack', 1, '192.1']
-        item2 = ['tony', 2, '192.2']
+        items = [['jack', 1, (192,1)],
+#                 ['tony', 2, (192,2)],
+                 ['alice', 3, (192,3)]]
         names = ['name', 'uid', 'ip']
-        d =  MIDict([item1, item2], names)
-        return d, names, item1, item2
+        d =  MIDict(items, names)
+        return d, names, items
 
     def test_getitem(self):
-        d, names, item1, item2 = self.getData()
+        d, names, items = self.getData()
         N = len(names)
-        for item in [item1, item2]:
+        for item in items:
+            # d[index1:key, index2] == val
+            index2_list = [] # variable index2 args
+
+            # index2: single value
+            for k in range(N):
+                index2_list.append(k)
+
+            # index2: multi values
+            index2_list.append(list(range(N)))
+            index2_list.append(slice(None, None, None))
+
+            index2_list.append(list(range(N))*2)  # any duplicate names
+
+            # d[index1:key, index2_1, index2_2, ...]
+            index2_list.append(tuple(range(N)))
+
+            index2_list.append(slice(None, None, 2))
+            index2_list.append(list(range(0, N, 2)))
+            index2_list.append(slice(None, N+10))
+
+            index2_list.append(slice(1, None))
+            index2_list.append(slice(None, 1))
+            index2_list.append(slice(0, -1))
+
+            index2_list.append([])
+            index2_list.append(slice(0, 0))
+
+            index2_val_comb = [] # variable index2 args and resulting val
+            for index2 in index2_list:
+                val = mget_list(item, index2)
+                if isinstance(index2, int):
+                    index2_val_comb.append([index2, val])
+                    index2_val_comb.append([-N+index2, val])
+                    index2_val_comb.append([names[index2], val])
+
+                elif isinstance(index2, list):
+                    mixed_name = [names[index2[k]] if k%2 else index2[k] for k in range(len(index2))]
+                    all_name = mget_list(names, index2)
+                    all_neg = [-N+i if i >=0 else i for i in index2]
+                    for arr in (index2, mixed_name, all_name, all_neg):
+                        index2_val_comb.append([arr, val])
+                        index2_val_comb.append([tuple(arr), val])
+
+                elif isinstance(index2, tuple):
+                    mixed_name = [names[index2[k]] if k%2 else index2[k] for k in range(len(index2))]
+                    all_name = mget_list(names, index2)
+                    all_neg = [-N+i if i >=0 else i for i in index2]
+                    for arr in (list(index2), mixed_name, all_name, all_neg):
+                        index2_val_comb.append(arr + [val])
+
+                elif isinstance(index2, slice):
+                    start_top_arr = [[], []]
+                    for k, arr in zip([index2.start, index2.stop], start_top_arr):
+                        arr.append(k)
+                        if -N <= k < N:
+                            arr.append(names[k])
+                    step = index2.step
+                    for start in start_top_arr[0]:
+                        for stop in start_top_arr[1]:
+                            index2_val_comb.append([slice(start, stop, step), val])
+
             for i, (index1, key) in enumerate(zip(names, item)):
-                # all possible syntax for [index1:key]
+                # all possible syntax for [index1:key] part
                 args = []
                 args.append(slice(index1,key))
                 args.append(slice(i,key))
@@ -38,89 +104,302 @@ class TestMIDict_3(unittest.TestCase):
                 if len(value) == 1:
                     value = value[0]
 
-                for arg in args:
-                    self.assertEqual(d[arg], value,
-                        '%r :not equal: d[%r] = %r' % (value, arg, d[arg]))
-                    if isinstance(arg, slice):
-                        # add a comma after arg
-                        self.assertEqual(d[arg,], value,
-                            '%r :not equal: d[%r] = %r' % (value, arg, d[arg]))
+                index2_val_all= list(index2_val_comb) # copy
 
-                # d[index1:key, index2] == val
-                index2_val = [] # index2 args and resulting val
-                index2_val.append([tuple(names), item])
-                index2_val.append([list(names), item])
-                index2_val.append([tuple(range(N)), item])
-                index2_val.append([list(range(N)), item])
-                index2_val.append([slice(None, None, None), item])
-
-                index2_val.append([list(names)*2, item*2]) # any duplicate names
-                index2_val.append([list(range(N))*2, item*2])
-
-                # d[index1:key, index2_1, index2_2, ...]
-                index2_val.append(list(names) + [item])
-                index2_val.append(list(range(N)) + [item])
-
-                index2_val.append([slice(None, None, 2), item[::2]])
-                index2_val.append([slice(1, None), item[1:]])
-                index2_val.append([slice(None, 1), item[:1]])
-                index2_val.append([slice(0, -1), item[0:-1]])
-                index2_val.append([slice(names[1], None), item[1:]])
-                index2_val.append([slice(None, names[1]), item[:1]])
-                index2_val.append([slice(names[0], names[-1]), item[0:-1]])
-
-                index2_val.append([(), []])
-                index2_val.append([[], []])
-                index2_val.append([slice(0, 0), []])
+                # no index2, d[index1:key] == value
+                index2_val_all.append([value])
 
                 for arg in args:
-                    for row in index2_val:
+                    for row in index2_val_all:
                         val = row[-1]
-                        para = tuple([arg] + row[:-1]) # [index1:key, index2]
-                        index2 = row[:-1] # maybe 1 or more
-                        if len(index2) == 1:
-                            index2 = index2[0]
+                        index2 = row[:-1] # maybe 0, 1 or more
+                        paras = []
+                        if len(index2) == 0:
+                            paras.append(arg)
+                            # add a comma after arg only when arg is a slice
+                            if isinstance(arg, slice):
+                                paras.append((arg,))
+                        else:
+                            paras.append(tuple([arg] + index2))
 
-                        if not isinstance(arg, slice):
-                            # d[key, tuple] or d[key, k1, k2...] not working
-                            if isinstance(index2, tuple) or len(para) > 2:
-                                with self.assertRaises(KeyError):
-                                    d[para]
-                                continue
+                        for para in paras:
+                            if not isinstance(arg, slice) and len(row) > 1:
+                                # d[key, name], d[key, i], d[key, tuple] or d[key, k1, k2...] not working
+                                if (len(para) == 2 and not isinstance(para[1], (list, slice))) or len(para) > 2:
+                                    with self.assertRaises(KeyError):
+                                        d[para]
+                                    continue
 
-                        self.assertEqual(d[para], val,
-                            '%r :not equal: d[%r] = %r' % (val, para, d[para]))
+                            self.assertEqual(d[para], val,
+                                '%r :not equal: d[%r] = %r' % (val, para, d[para]))
+
+
+    def test_getitem_error(self):
+        d, names, items = self.getData()
+        N = len(names)
+        M1 = N + 10 # out of range
+        M2 = -N - 10
+
+        index_exist = names[0]
+        index_not_exist = get_unique_name('', names)
+        key_exist = d.keys()[0]
+        key_not_exist = get_unique_name('', d)
+
+        # d[index_exist:key_exist] is valid
+        d[index_exist:key_exist]
+
+        paras = []
+        for index1 in [index_not_exist, M1, M2]: # index not exist
+            for key in [key_exist, key_not_exist]:
+                paras.append(slice(index1, key))
+
+        for index1 in [index_exist, 0]:
+            paras.append(slice(index1, key_not_exist)) # only key not exist
+
+        for index2 in [index_not_exist, M1, M2]: # index2 not exist
+            paras.append((slice(index_exist, key_exist), index2))
+            for index2_exist in [index_exist, 0]:
+                paras.append((slice(index_exist, key_exist), [index2, index2_exist]))
+                paras.append((slice(index_exist, key_exist), index2, index2_exist))
+                # extra arg after index2
+                paras.append((slice(index_exist, key_exist), [index2, index2_exist], index2))
+
+
+        for para in paras:
+            with self.assertRaises(KeyError):
+                d[para]
 
 
 
-#    def test_setitem(self):
-#        d = self.d
-#        d['jack'] = 10
-#        d['alice'] = 2 # -> ValueError
-#        d['jack'] = 2 # -> ValueError
-#        d[:2] = 'jack'
-#        d['name':'jack', :] = ['tony', 22]
+
+    def test_setitem(self):
+        d, names, items = self.getData()
+        N = len(names)
+        L = len(items)
+        # modify items, construct a new MIDict, and compare with results by setitem
+
+        for k_item, item_old in enumerate(items):
+            # complete new keys
+            item_new = [get_unique_name('', d.keys(i)) for i in range(N)]
+
+            # d[index1:key, index2] == val
+            index2_list = [] # variable index2 args
+
+            # index2: single value
+            for k in range(N):
+                index2_list.append(k)
+
+            # index2: multi values
+            index2_list.append(list(range(N)))
+            index2_list.append(slice(None, None, None))
+
+            index2_list.append(list(range(N))*2)  # any duplicate names
+
+            # d[index1:key, index2_1, index2_2, ...]
+            index2_list.append(tuple(range(N)))
+
+            index2_list.append(slice(None, None, 2))
+            index2_list.append(list(range(0, N, 2)))
+            index2_list.append(slice(None, N+10))
+
+            index2_list.append(slice(1, None))
+            index2_list.append(slice(None, 1))
+            index2_list.append(slice(0, -1))
+
+            index2_list.append([])
+            index2_list.append(slice(0, 0))
+
+            index2_val_comb = [] # variable index2 args and resulting val
+            for index2 in index2_list:
+                for item in [item_old, item_new]:
+                    val = [index2, item] # value will be calucated later using index2
+
+                    if isinstance(index2, int):
+                        index2_val_comb.append([index2, val])
+                        index2_val_comb.append([-N+index2, val])
+                        index2_val_comb.append([names[index2], val])
+
+                    elif isinstance(index2, list):
+                        mixed_name = [names[index2[k]] if k%2 else index2[k] for k in range(len(index2))]
+                        all_name = mget_list(names, index2)
+                        all_neg = [-N+i if i >=0 else i for i in index2]
+                        for arr in (index2, mixed_name, all_name, all_neg):
+                            index2_val_comb.append([arr, val])
+                            index2_val_comb.append([tuple(arr), val])
+
+                    elif isinstance(index2, tuple):
+                        mixed_name = [names[index2[k]] if k%2 else index2[k] for k in range(len(index2))]
+                        all_name = mget_list(names, index2)
+                        all_neg = [-N+i if i >=0 else i for i in index2]
+                        for arr in (list(index2), mixed_name, all_name, all_neg):
+                            index2_val_comb.append(arr + [val])
+
+                    elif isinstance(index2, slice):
+                        start_top_arr = [[], []]
+                        for k, arr in zip([index2.start, index2.stop], start_top_arr):
+                            arr.append(k)
+                            if -N <= k < N:
+                                arr.append(names[k])
+                        step = index2.step
+                        for start in start_top_arr[0]:
+                            for stop in start_top_arr[1]:
+                                index2_val_comb.append([slice(start, stop, step), val])
+
+            for i, (index1, key) in enumerate(zip(names, item_old)):
+                # all possible syntax for [index1:key] part
+                args = []
+                args.append(slice(index1,key))
+                args.append(slice(i,key))
+                args.append(slice(-N+i,key))
+                if i == 0:
+                    args.append(key)
+                if i == N-1:
+                    args.append(slice(None, key))
+
+                index2_val_all= list(index2_val_comb) # copy
+
+                index2_default = [k for k in range(N) if k != i]
+                if len(index2_default) == 1:
+                    index2_default = index2_default[0]
+
+                for item in [item_old, item_new]:
+                    # no index2, d[index1:key] = value
+                    val = [index2_default, item]
+                    index2_val_all.append([val])
+
+                for arg in args:
+                    for row in index2_val_all:
+                        val_index, item = row[-1]
+                        value = mget_list(item, val_index)
+
+                        item_modified = list(item_old)
+                        mset_list(item_modified, val_index, value)
+
+                        items_new = list(items)
+                        if k_item < L:
+                            items_new[k_item] = item_modified
+                        d_new = MIDict(items_new, names)
+
+                        index2 = row[:-1] # maybe 0, 1 or more
+                        paras = []
+                        if len(index2) == 0:
+                            paras.append(arg)
+                            # add a comma after arg only when arg is a slice
+                            if isinstance(arg, slice):
+                                paras.append((arg,))
+                        else:
+                            paras.append(tuple([arg] + index2))
+
+                        for para in paras:
+                            d2 = MIDict(items, names) # copy
+
+                            if not isinstance(arg, slice) and len(row) > 1:
+                                # d[key, name], d[key, i], d[key, tuple] or d[key, k1, k2...] not working
+                                if (len(para) == 2 and not isinstance(para[1], (list, slice))) or len(para) > 2:
+                                    with self.assertRaises(KeyError):
+                                        try:
+                                            d2[para]
+                                            print 'not raise', para, value
+                                        except:
+                                            raise
+                                    continue
+
+                            try:
+                                d2[para] = value
+                            except:
+                                print 'error', para, value
+                                raise
+                            self.assertEqual(d2, d_new,
+                                '%r :not equal: %r, d[%r] = %r' % (d_new, d2, para, value))
+
+#
+#
+#        item_new_arr = [] # [k_item, i, item_new]
+#        for k_item, item in enumerate(items):
+#            item_new_arr.append([k_item, None, item]) # no change
+#            for i, (index1, key) in enumerate(zip(names, item)):
+#                key_new = get_unique_name('', d.keys(i))
+#                item_new = list(item) # copy
+#                item_new[i] = key_new
+#                item_new_arr.append([k_item, i, item_new])
+#        # set new item with new key
+##        item_new = []
+##        for i in range(N):
+##            key_new = get_unique_name('', d.keys(i))
+##            item_new.append(key_new)
+##        for i in range(N):
+##            item_new_arr.append([L, i, item_new])
+#
+#        for k_item, i, item in item_new_arr:
+#            item_old = items[k_item]
+#            items_new = list(items)
+#            if k_item < L:
+#                items_new[k_item] = item
+##            elif k_item == L:
+##                items_new.append(item)
+#            d_new = MIDict(items_new, names)
+#
+#            index1 = names[i]
+#            key = item_old[i]
+
 
 
 class TestMIDict_2(TestMIDict_3):
 
     def getData(self):
-        item1 = ['jack', 1]
-        item2 = ['tony', 2]
+        items = [['jack', 1],
+#                 ['tony', 2],
+                 ['alice', 3]]
         names = ['name', 'uid']
-        d =  MIDict([item1, item2], names)
-        return d, names, item1, item2
+        d =  MIDict(items, names)
+        return d, names, items
 
-    def test_compat_dict(self):
-        from collections import OrderedDict
-        d, names, item1, item2 = self.getData()
+    def test_convert_dict(self):
+        d, names, items = self.getData()
         for cls in [dict, OrderedDict]:
-            normal_d = cls([item1, item2])
+            normal_d = cls(items)
             for d_var in [d, cls(d), d.todict(cls)]:
                 self.assertEqual(d_var, normal_d)
                 self.assertEqual(normal_d, d_var)
 
+    def test_compatible_dict(self):
+        d, names, items = self.getData()
+        dct = dict(items)
+        od = OrderedDict(items)
 
+        key_exist = d.keys()[0]
+        key_not_exist = get_unique_name('', d)
+
+        funcs = ['__len__', ]
+        for d2 in [dct, od]:
+            for f in funcs:
+                self.assertEqual(call(d, f), call(d2, f))
+
+        funcs_ordered = ['keys', 'values', 'items']
+        for f in funcs_ordered:
+            self.assertItemsEqual(call(d, f), call(dct, f))
+            self.assertEqual(call(d, f), call(od, f))
+
+        funcs_ordered_views = ['viewkeys', 'viewvalues', 'viewitems']
+        for f in funcs_ordered_views:
+            self.assertItemsEqual(list(call(d, f)), list(call(dct, f)))
+            self.assertEqual(list(call(d, f)), list(call(od, f)))
+
+        funcs_key = ['__contains__', 'has_key', 'get']
+        for d2 in [dct, od]:
+            for f in funcs_key:
+                for key in [key_exist, key_not_exist]:
+                    self.assertIs(call(d, f, (key,)), call(d2, f, (key,)))
+
+        # same Key Error
+        exc_types = []
+        for d2 in [d, dct, od]:
+            try:
+                d[key_not_exist]
+            except Exception as e:
+                exc_types.append(type(e))
+        for t in exc_types[1:]:
+            self.assertEqual(exc_types[0], t)
 
 
 if __name__ == '__main__':

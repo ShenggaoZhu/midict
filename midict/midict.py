@@ -176,7 +176,7 @@ def _key_to_index(keys, key, single_only=False):
         try:
             keys[key]
         except IndexError:
-            raise KeyError('Index out range of keys: %s' % (key,))
+            raise KeyError('Index out of range of keys: %s' % (key,))
         if key < 0:
             key += len(keys) # always positive index
         return key
@@ -202,7 +202,7 @@ def _key_to_index(keys, key, single_only=False):
             return range(*args) # list of indices
     try:
         return keys.index(key)
-    except IndexError:
+    except ValueError: # not IndexError
         raise KeyError('Key not found: %s' % (key,))
 
 
@@ -435,9 +435,9 @@ def MI_check_index_name(name):
                         'Found type %s for %s' % (type(name), name))
 
 
-def get_unique_name(name, collection):
+def get_unique_name(name='', collection=()):
     '''
-    Generate a unique name by appending a sequence number to
+    Generate a unique name (str type) by appending a sequence number to
     the original name so that it is not contained in the collection.
     ``collection`` has a __contains__ method (tuple, list, dict, etc.)
     '''
@@ -511,8 +511,11 @@ def MI_parse_args(self, args, ingore_index2=False, allow_new=False):
 
             # args[0] is not a slice
             if Nargs > 1 and isinstance(args[1], (list, slice)):
-                key, index2 = args
-                break
+                if Nargs == 2:
+                    key, index2 = args
+                    break
+                else:
+                    raise KeyError('No arguments allowed after index2, found: %s' % (args[2:],))
         else:
             key = args
 
@@ -581,7 +584,8 @@ def MI_parse_args(self, args, ingore_index2=False, allow_new=False):
         if allow_new:  # new key for setitem; item_d = None
             item = None
         else:
-            raise KeyError('Key not found in index "%s": %s' % (index1, key))
+            raise KeyError('Key not found in index #%s "%s": %s' %
+                            (index1, names[index1], key))
 
     if ingore_index2:  # used by delitem
         return item
