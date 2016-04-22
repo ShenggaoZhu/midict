@@ -2,9 +2,24 @@
 MIDict (Multi-Index Dict)
 =========================
 
-A multi-index dictionary (MIDict) allowing any index as the "keys" or "values"
-(suitable for bidirectional/inverse dict) with powerful indexing syntax to
-assess multiple values.
+MIDict is an ordered "dictionary" with multiple indices
+where any index can serve as "keys" or "values",
+capable of assessing multiple values via its powerful indexing syntax,
+and suitable as a bidirectional/inverse dict (a drop-in replacement
+for dict/OrderedDict).
+
+**Features**:
+
+* Multiple indices
+* Multi-value indexing syntax
+* Convenient indexing shortcuts
+* Bidirectional/inverse dict
+* Compatible with normal dict
+* Accessing keys via attributes
+* Extended methods for multi-indices
+* Additional APIs to handle indices
+* Duplicate keys/values handling
+
 
 Multiple indices
 ----------------
@@ -41,7 +56,6 @@ contain the corresponding key's value or list of values::
 
     user['jack'] -> [1, '192.1']
 
-
 To use any index (column) as the "keys", and other one or more
 indices as the "values", just specify the indices via the advanced
 indexing syntax ``d[index1:key, index2]``, e.g.::
@@ -55,22 +69,30 @@ an element in ``index1`` to locate the row of record (e.g.,
 to specify the value(s) from the row of record.
 
 
-Multi-item indexing
--------------------
+Multi-value indexing syntax
+---------------------------
 
 For a multi-column data set, it's useful to be able to access multiple
-columns/indices at the same time.
+values/columns at the same time.
 
 In the indexing syntax ``d[index1:key, index2]``, both ``index1`` and
 ``index2`` support flexible indexing using a normal key or an ``int``,
 and ``index2`` can also be a ``tuple``, ``list`` or ``slice`` object
-to specify multiple columns/indices, with the following meanings
-(see ``IndexDict`` for more details)::
+to specify multiple values/columns, with the following meanings
+(the elements in the tuple/list or ``key_start``/``key_stop`` in the slice
+can be either a key or index of a key):
 
-    int -> the index of a key in d.keys()
-    tuple/list -> multiple keys or indices of keys or mixture
-    slice(key_start, key_stop, step) -> a range of keys
-    # key_start and key_stop can be a key or index of a key
+========== ========================================= ====================
+    type                    meaning                  corresponding values
+========== ========================================= ====================
+int        the index of a key in d.keys()            the value of the key
+---------- ----------------------------------------- --------------------
+tuple/list multiple keys or indices of keys          list of values
+---------- ----------------------------------------- --------------------
+slice      a range of keys (key_start:key_stop:step) list of values
+========== ========================================= ====================
+
+See ``IndexDict`` for more details.
 
 Using the above ``user`` example::
 
@@ -142,8 +164,8 @@ Conversion between ``MIDict`` and ``dict`` is supported in both directions::
     normal_dict == mi_dict.todict() # True
 
 
-Attributes as keys
-------------------
+Accessing keys via attributes
+-----------------------------
 
 Use the attribute syntax to access a key in MIDict if it is a valid
 Python identifier (``d.key`` <==> d['key'])::
