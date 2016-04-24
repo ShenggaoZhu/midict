@@ -6,7 +6,7 @@ Created on Wed Apr 20 11:13:35 2016
 """
 #from __future__ import absolute_import
 import unittest
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 from midict.midict import *
 
 def call(obj, func_name, *args, **kw):
@@ -172,18 +172,22 @@ class TestMIDict_3(unittest.TestCase):
 
 
 
-    def test_setitem_exist(self):
+    def test_setitem_not_empty(self):
         # modify existing items, construct a new MIDict, and compare with results of setitem
         d, names, items = self.getData()
         N = len(names)
+        L = len(items)
 
         # cached signature and d_new
         cache_sign = []
         cache_d = []
-
-        for k_item, item_old in enumerate(items):
+        cnt = Counter()
+        for k_item, item_old in enumerate(items + [None]):
+            # when k_item == L, item_old is None
             # complete new keys
             item_new = [get_unique_name('', d.keys(i)) for i in range(N)]
+            is_new = k_item == L
+            item_choices = [item_new] if is_new else [item_old, item_new]
 
             # d[index1:key, index2] == val
             index2_list = [] # variable index2 args
@@ -214,7 +218,7 @@ class TestMIDict_3(unittest.TestCase):
 
             index2_val_comb = [] # variable index2 args and resulting val
             for index2 in index2_list:
-                for item in [item_old, item_new]:
+                for item in item_choices:
                     val = [index2, item] # value will be calucated later using index2
 
                     if isinstance(index2, int):
@@ -248,7 +252,8 @@ class TestMIDict_3(unittest.TestCase):
                             for stop in start_top_arr[1]:
                                 index2_val_comb.append([slice(start, stop, step), val])
 
-            for i, (index1, key) in enumerate(zip(names, item_old)):
+            keys = item_new if is_new else item_old
+            for i, (index1, key) in enumerate(zip(names, keys)):
                 # all possible syntax for [index1:key] part
                 args = []
                 args.append(slice(index1,key))
@@ -265,7 +270,7 @@ class TestMIDict_3(unittest.TestCase):
                 if len(index2_default) == 1:
                     index2_default = index2_default[0]
 
-                for item in [item_old, item_new]:
+                for item in item_choices:
                     # no index2, d[index1:key] = value
                     val = [index2_default, item]
                     index2_val_all.append([val])
@@ -273,6 +278,18 @@ class TestMIDict_3(unittest.TestCase):
                 for arg in args:
                     for row in index2_val_all:
                         val_index, item = row[-1]
+                        if is_new:
+                            # new item needs complete indices
+                            all_indices = [i]
+                            if isinstance(val_index, int):
+                                all_indices.append(val_index)
+                            elif isinstance(val_index, (tuple, list)):
+                                all_indices.extend(val_index)
+                            elif isinstance(val_index, slice):
+                                all_indices.extend(list(range(N))[val_index])
+                            if set(all_indices) != set(range(N)):
+                                continue
+
                         value = mget_list(item, val_index)
 
                         sign = [k_item, val_index, item]
@@ -280,11 +297,13 @@ class TestMIDict_3(unittest.TestCase):
                             idx = cache_sign.index(sign)
                             d_new = cache_d[idx]
                         except ValueError:
-                            item_modified = list(item_old)
-                            mset_list(item_modified, val_index, value)
-
                             items_new = list(items)
-                            items_new[k_item] = item_modified
+                            if is_new:
+                                items_new.append(item_new)
+                            else:
+                                item_modified = list(item_old)
+                                mset_list(item_modified, val_index, value)
+                                items_new[k_item] = item_modified
                             d_new = MIDict(items_new, names)
 
                             cache_sign.insert(0, sign)
@@ -302,6 +321,7 @@ class TestMIDict_3(unittest.TestCase):
 
                         for para in paras:
                             d2 = MIDict(items, names) # copy
+                            cnt[k_item] += 1
 
                             if not isinstance(arg, slice) and len(row) > 1:
                                 # d[key, name], d[key, i], d[key, tuple] or d[key, k1, k2...] not working
@@ -321,188 +341,10 @@ class TestMIDict_3(unittest.TestCase):
                                 raise
                             self.assertEqual(d2, d_new,
                                 '%r :not equal: %r, d[%r] = %r' % (d_new, d2, para, value))
+        print cnt
 
-    def test_setitem_new(self):
+    def test_setitem_empty(self):
         return
-        d, names, items = self.getData()
-        N = len(names)
-#        L = len(items)
-
-        # modify items, construct a new MIDict, and compare with results by setitem
-
-        cache_d = []
-        cache_sign = []
-
-        for k_item, item_old in enumerate(items):
-            # complete new keys
-            item_new = [get_unique_name('', d.keys(i)) for i in range(N)]
-
-            # d[index1:key, index2] == val
-            index2_list = [] # variable index2 args
-
-            # index2: single value
-            for k in range(N):
-                index2_list.append(k)
-
-            # index2: multi values
-            index2_list.append(list(range(N)))
-            index2_list.append(slice(None, None, None))
-
-            index2_list.append(list(range(N))*2)  # any duplicate names
-
-            # d[index1:key, index2_1, index2_2, ...]
-            index2_list.append(tuple(range(N)))
-
-            index2_list.append(slice(None, None, 2))
-            index2_list.append(list(range(0, N, 2)))
-            index2_list.append(slice(None, N+10))
-
-            index2_list.append(slice(1, None))
-            index2_list.append(slice(None, 1))
-            index2_list.append(slice(0, -1))
-
-            index2_list.append([])
-            index2_list.append(slice(0, 0))
-
-            index2_val_comb = [] # variable index2 args and resulting val
-            for index2 in index2_list:
-                for item in [item_old, item_new]:
-                    val = [index2, item] # value will be calucated later using index2
-
-                    if isinstance(index2, int):
-                        index2_val_comb.append([index2, val])
-                        index2_val_comb.append([-N+index2, val])
-                        index2_val_comb.append([names[index2], val])
-
-                    elif isinstance(index2, list):
-                        mixed_name = [names[index2[k]] if k%2 else index2[k] for k in range(len(index2))]
-                        all_name = mget_list(names, index2)
-                        all_neg = [-N+i if i >=0 else i for i in index2]
-                        for arr in (index2, mixed_name, all_name, all_neg):
-                            index2_val_comb.append([arr, val])
-                            index2_val_comb.append([tuple(arr), val])
-
-                    elif isinstance(index2, tuple):
-                        mixed_name = [names[index2[k]] if k%2 else index2[k] for k in range(len(index2))]
-                        all_name = mget_list(names, index2)
-                        all_neg = [-N+i if i >=0 else i for i in index2]
-                        for arr in (list(index2), mixed_name, all_name, all_neg):
-                            index2_val_comb.append(arr + [val])
-
-                    elif isinstance(index2, slice):
-                        start_top_arr = [[], []]
-                        for k, arr in zip([index2.start, index2.stop], start_top_arr):
-                            arr.append(k)
-                            if -N <= k < N:
-                                arr.append(names[k])
-                        step = index2.step
-                        for start in start_top_arr[0]:
-                            for stop in start_top_arr[1]:
-                                index2_val_comb.append([slice(start, stop, step), val])
-
-            for i, (index1, key) in enumerate(zip(names, item_old)):
-                # all possible syntax for [index1:key] part
-                args = []
-                args.append(slice(index1,key))
-                args.append(slice(i,key))
-                args.append(slice(-N+i,key))
-                if i == 0:
-                    args.append(key)
-                if i == N-1:
-                    args.append(slice(None, key))
-
-                index2_val_all= list(index2_val_comb) # copy
-
-                index2_default = [k for k in range(N) if k != i]
-                if len(index2_default) == 1:
-                    index2_default = index2_default[0]
-
-                for item in [item_old, item_new]:
-                    # no index2, d[index1:key] = value
-                    val = [index2_default, item]
-                    index2_val_all.append([val])
-
-                for arg in args:
-                    for row in index2_val_all:
-                        val_index, item = row[-1]
-                        value = mget_list(item, val_index)
-
-                        sign = [k_item, val_index, item]
-                        try:
-                            idx = cache_sign.index(sign)
-                            d_new = cache_d[idx]
-                        except ValueError:
-                            item_modified = list(item_old)
-                            mset_list(item_modified, val_index, value)
-
-                            items_new = list(items)
-                            items_new[k_item] = item_modified
-                            d_new = MIDict(items_new, names)
-
-                            cache_sign.insert(0, sign)
-                            cache_d.insert(0, d_new)
-
-                        index2 = row[:-1] # maybe 0, 1 or more
-                        paras = []
-                        if len(index2) == 0:
-                            paras.append(arg)
-                            # add a comma after arg only when arg is a slice
-                            if isinstance(arg, slice):
-                                paras.append((arg,))
-                        else:
-                            paras.append(tuple([arg] + index2))
-
-                        for para in paras:
-                            d2 = MIDict(items, names) # copy
-
-                            if not isinstance(arg, slice) and len(row) > 1:
-                                # d[key, name], d[key, i], d[key, tuple] or d[key, k1, k2...] not working
-                                if (len(para) == 2 and not isinstance(para[1], (list, slice))) or len(para) > 2:
-                                    with self.assertRaises(KeyError):
-                                        try:
-                                            d2[para]
-                                            print 'not raise', para, value
-                                        except:
-                                            raise
-                                    continue
-
-                            try:
-                                d2[para] = value
-                            except:
-                                print 'error', para, value
-                                raise
-                            self.assertEqual(d2, d_new,
-                                '%r :not equal: %r, d[%r] = %r' % (d_new, d2, para, value))
-#
-#
-#        item_new_arr = [] # [k_item, i, item_new]
-#        for k_item, item in enumerate(items):
-#            item_new_arr.append([k_item, None, item]) # no change
-#            for i, (index1, key) in enumerate(zip(names, item)):
-#                key_new = get_unique_name('', d.keys(i))
-#                item_new = list(item) # copy
-#                item_new[i] = key_new
-#                item_new_arr.append([k_item, i, item_new])
-#        # set new item with new key
-##        item_new = []
-##        for i in range(N):
-##            key_new = get_unique_name('', d.keys(i))
-##            item_new.append(key_new)
-##        for i in range(N):
-##            item_new_arr.append([L, i, item_new])
-#
-#        for k_item, i, item in item_new_arr:
-#            item_old = items[k_item]
-#            items_new = list(items)
-#            if k_item < L:
-#                items_new[k_item] = item
-##            elif k_item == L:
-##                items_new.append(item)
-#            d_new = MIDict(items_new, names)
-#
-#            index1 = names[i]
-#            key = item_old[i]
-
 
 
 class TestMIDict_2(TestMIDict_3):
