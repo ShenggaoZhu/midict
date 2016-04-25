@@ -10,8 +10,55 @@ from collections import OrderedDict, Counter
 from midict.midict import *
 
 def call(obj, func_name, *args, **kw):
+    'call function by `func_name` of obj'
     func = getattr(obj, func_name)
     return func(*args, **kw)
+
+
+class _Slice(object):
+    '''
+    easy creating slice obj.
+    _s = _SliceObj()
+    _s[1:] -> slice(1, None, None)
+    '''
+    def __getitem__(self, arg):
+        return arg
+
+    def __setitem__(self, arg, val):
+        return arg, val
+
+_s = _Slice()
+
+
+
+
+#==============================================================================
+# test cases
+#==============================================================================
+
+
+
+
+class TestMIDict_Basic(unittest.TestCase):
+
+    def test_construction(self):
+        data = []
+        N_items = 3
+        for k_indices in [2, 3, 5, 10]: # number of indices
+            items = []
+            for n in range(N_items):
+                item = [i+n for i in range(k_indices)] # populate values
+                items.append(item)
+            names = map(str, range(k_indices))
+            data.append([items, names])
+        for items, names in data:
+            d = MIDict(items, names)
+            self.assertEqual(d.indices.keys(), names)
+            self.assertEqual(d.items(), [tuple(it) for it in items])
+
+    def test_construction_error(self):
+        ''
+
 
 class TestMIDict_3(unittest.TestCase):
 
@@ -36,23 +83,23 @@ class TestMIDict_3(unittest.TestCase):
 
             # index2: multi values
             index2_list.append(list(range(N)))
-            index2_list.append(slice(None, None, None))
+            index2_list.append(_s[:])
 
             index2_list.append(list(range(N))*2)  # any duplicate names
 
             # d[index1:key, index2_1, index2_2, ...]
             index2_list.append(tuple(range(N)))
 
-            index2_list.append(slice(None, None, 2))
+            index2_list.append(_s[::2])
             index2_list.append(list(range(0, N, 2)))
-            index2_list.append(slice(None, N+10))
+            index2_list.append(_s[:N+10])
 
-            index2_list.append(slice(1, None))
-            index2_list.append(slice(None, 1))
-            index2_list.append(slice(0, -1))
+            index2_list.append(_s[1:])
+            index2_list.append(_s[:1])
+            index2_list.append(_s[0:-1])
 
             index2_list.append([])
-            index2_list.append(slice(0, 0))
+            index2_list.append(_s[0:0])
 
             index2_val_comb = [] # variable index2 args and resulting val
             for index2 in index2_list:
@@ -86,18 +133,18 @@ class TestMIDict_3(unittest.TestCase):
                     step = index2.step
                     for start in start_top_arr[0]:
                         for stop in start_top_arr[1]:
-                            index2_val_comb.append([slice(start, stop, step), val])
+                            index2_val_comb.append([_s[start : stop : step], val])
 
             for i, (index1, key) in enumerate(zip(names, item)):
                 # all possible syntax for [index1:key] part
                 args = []
-                args.append(slice(index1,key))
-                args.append(slice(i,key))
-                args.append(slice(-N+i,key))
+                args.append(_s[index1: key])
+                args.append(_s[i: key])
+                args.append(_s[-N+i: key])
                 if i == 0:
                     args.append(key)
                 if i == N-1:
-                    args.append(slice(None, key))
+                    args.append(_s[:key])
 
                 # d[index1:key] == value
                 value = [v for v in item if v != key]
@@ -151,18 +198,19 @@ class TestMIDict_3(unittest.TestCase):
         paras = []
         for index1 in [index_not_exist, M1, M2]: # index not exist
             for key in [key_exist, key_not_exist]:
-                paras.append(slice(index1, key))
+                paras.append(_s[index1:key])
 
         for index1 in [index_exist, 0]:
-            paras.append(slice(index1, key_not_exist)) # only key not exist
+            paras.append(_s[index1: key_not_exist]) # only key not exist
 
+        arg_exist = _s[index_exist: key_exist]
         for index2 in [index_not_exist, M1, M2]: # index2 not exist
-            paras.append((slice(index_exist, key_exist), index2))
+            paras.append((arg_exist, index2))
             for index2_exist in [index_exist, 0]:
-                paras.append((slice(index_exist, key_exist), [index2, index2_exist]))
-                paras.append((slice(index_exist, key_exist), index2, index2_exist))
+                paras.append((arg_exist, [index2, index2_exist]))
+                paras.append((arg_exist, index2, index2_exist))
                 # extra arg after index2
-                paras.append((slice(index_exist, key_exist), [index2, index2_exist], index2))
+                paras.append((arg_exist, [index2, index2_exist], index2))
 
 
         for para in paras:
@@ -172,7 +220,7 @@ class TestMIDict_3(unittest.TestCase):
 
 
 
-    def test_setitem_not_empty(self):
+    def test_setitem_nonempty(self):
         # modify existing items, construct a new MIDict, and compare with results of setitem
         d, names, items = self.getData()
         N = len(names)
@@ -198,23 +246,24 @@ class TestMIDict_3(unittest.TestCase):
 
             # index2: multi values
             index2_list.append(list(range(N)))
-            index2_list.append(slice(None, None, None))
+            index2_list.append(_s[:])
 
             index2_list.append(list(range(N))*2)  # any duplicate names
 
             # d[index1:key, index2_1, index2_2, ...]
             index2_list.append(tuple(range(N)))
 
-            index2_list.append(slice(None, None, 2))
+            index2_list.append(_s[::2])
             index2_list.append(list(range(0, N, 2)))
-            index2_list.append(slice(None, N+10))
+            index2_list.append(_s[:N+10])
 
-            index2_list.append(slice(1, None))
-            index2_list.append(slice(None, 1))
-            index2_list.append(slice(0, -1))
+            index2_list.append(_s[1:])
+            index2_list.append(_s[:1])
+            index2_list.append(_s[0:-1])
 
             index2_list.append([])
-            index2_list.append(slice(0, 0))
+            index2_list.append(_s[0:0])
+
 
             index2_val_comb = [] # variable index2 args and resulting val
             for index2 in index2_list:
@@ -250,19 +299,19 @@ class TestMIDict_3(unittest.TestCase):
                         step = index2.step
                         for start in start_top_arr[0]:
                             for stop in start_top_arr[1]:
-                                index2_val_comb.append([slice(start, stop, step), val])
+                                index2_val_comb.append([_s[start : stop : step], val])
 
             keys = item_new if is_new else item_old
             for i, (index1, key) in enumerate(zip(names, keys)):
                 # all possible syntax for [index1:key] part
                 args = []
-                args.append(slice(index1,key))
-                args.append(slice(i,key))
-                args.append(slice(-N+i,key))
+                args.append(_s[index1: key])
+                args.append(_s[i: key])
+                args.append(_s[-N+i: key])
                 if i == 0:
                     args.append(key)
                 if i == N-1:
-                    args.append(slice(None, key))
+                    args.append(_s[:key])
 
                 index2_val_all= list(index2_val_comb) # copy
 
@@ -344,7 +393,34 @@ class TestMIDict_3(unittest.TestCase):
         print cnt
 
     def test_setitem_empty(self):
-        return
+        d, names, items = self.getData()
+        N = len(names)
+
+        index1 = names[0]
+        item = items[0]
+        key = item[0]
+        idx = 1 if N == 2 else _s[1:]
+        index2 = names[idx]
+        value = item[idx]
+
+        paras_names = []
+        paras_names.append([(_s[index1:key], index2), value, names])
+        if N > 2:
+            paras_names.append([(_s[index1:key],) + tuple(index2), value, names])
+
+        if N == 2:
+            paras_names.append([key, value, ['index_1', 'index_2']])
+            paras_names.append([_s[:value], key, ['index_1', 'index_2']])
+            # name conflict
+            paras_names.append([_s['index_2':key], value, ['index_2', get_unique_name('index_2', ['index_2'])]])
+
+        for para, val, indices in paras_names:
+            d = MIDict([item], indices) # with only one item
+            d2 = MIDict() # empty dict
+            d2[para] = val
+            self.assertEqual(d2, d, '%r :not equal: %r, d[%r] = %r' % (d, d2, para, val))
+
+
 
 
 class TestMIDict_2(TestMIDict_3):

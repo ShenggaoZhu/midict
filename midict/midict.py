@@ -1600,11 +1600,17 @@ class MIDict(MIMapping):
         int/slice syntax can only change values of existing keys, not creating new keys
 
         If ``d.indices`` is empty (i.e., no index names are set), index names
-        can be created when setting a new item with specified names:
+        can be created when setting a new item with specified names (the orders of
+        the indices are defined by ``index1`` and ``index2``):
 
             d = MIDict()
             d['uid':1, 'name'] = 'jack'
             # d -> MIDict([[1, 'jack']], ['uid', 'name'])
+
+            d = MIDict()
+            d[1] = 'jack' # using default index names
+            <==> d[:'jack'] = 1
+            # d -> MIDict([(1, 'jack')], ['index_1', 'index_2'])
 
         If ``d.indices`` is not empty, when setting a new item, all indices and values
         must be specified:
