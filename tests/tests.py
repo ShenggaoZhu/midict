@@ -7,6 +7,10 @@ Created on Wed Apr 20 11:13:35 2016
 #from __future__ import absolute_import
 import unittest
 from collections import OrderedDict, Counter
+
+
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from midict.midict import *
 
 def call(obj, func_name, *args, **kw):
@@ -341,22 +345,25 @@ class TestMIDict_3(unittest.TestCase):
 
                         value = mget_list(item, val_index)
 
-                        sign = [k_item, val_index, item]
-                        try:
-                            idx = cache_sign.index(sign)
-                            d_new = cache_d[idx]
-                        except ValueError:
-                            items_new = list(items)
-                            if is_new:
-                                items_new.append(item_new)
-                            else:
-                                item_modified = list(item_old)
-                                mset_list(item_modified, val_index, value)
-                                items_new[k_item] = item_modified
-                            d_new = MIDict(items_new, names)
+                        if item == item_old: # no changes
+                            d_new = d
+                        else:
+                            sign = [k_item, val_index, item]
+                            try:
+                                idx = cache_sign.index(sign)
+                                d_new = cache_d[idx]
+                            except ValueError:
+                                items_new = list(items)
+                                if is_new:
+                                    items_new.append(item_new)
+                                else:
+                                    item_modified = list(item_old)
+                                    mset_list(item_modified, val_index, value)
+                                    items_new[k_item] = item_modified
+                                d_new = MIDict(items_new, names)
 
-                            cache_sign.insert(0, sign)
-                            cache_d.insert(0, d_new)
+                                cache_sign.insert(0, sign)
+                                cache_d.insert(0, d_new)
 
                         index2 = row[:-1] # maybe 0, 1 or more
                         paras = []
@@ -409,6 +416,7 @@ class TestMIDict_3(unittest.TestCase):
         paras_names.append([_s[index1:key, index2], value, names])
         if N > 2:
             paras_names.append([(_s[index1:key],) + tuple(index2), value, names])
+            paras_names.append([(_s[index1:key],) + tuple(index2), iter(value), names])
 
         default_names = ['index_%s'%(i+1) for i in range(N)]
         paras_names.append([_s[item[0], names[1:]], item[1:], default_names[:1]+names[1:]])
@@ -437,25 +445,25 @@ class TestMIDict_3(unittest.TestCase):
         index_exist = names[0]
         index_not_exist = get_unique_name('', names)
 
+        assert len(items) > 1
         item = items[0]
+        item2 = items[-1] # differ from item
+
         key_exist = item[0]
         key_not_exist = get_unique_name('', d)
         idx = 1 if N == 2 else _s[1:]
         value = item[idx]
+        value2 = item2[idx]
 
         # d[index_exist:key_exist] is valid
         d[index_exist:key_exist]
 
         paras = []
-        for index1 in [index_not_exist, M1, M2]: # index1 not exist
+        # index1 not exist
+        for index1 in [index_not_exist, M1, M2]:
             for key in [key_exist, key_not_exist]:
                 paras.append([_s[index1:key], value, KeyError])
 
-        for index1 in [index_exist, 0]:
-            # index2 mot match value
-            paras.append([_s[index1: key_exist, [0]], [], ValueError])
-            # Indices of the new item do not match existing indices
-            paras.append([_s[index1: key_not_exist, index1], key_not_exist, ValueError])
 
         # index2 not exist; faked matched values
         arg_exist = _s[index_exist: key_exist]
@@ -466,6 +474,20 @@ class TestMIDict_3(unittest.TestCase):
                 paras.append([(arg_exist, index2, index2_exist), [0,1], KeyError])
                 # extra arg after index2
                 paras.append([(arg_exist, [index2, index2_exist], index2), [0,1], KeyError])
+
+         # value exists
+        paras.append([(arg_exist,-1), d.keys(-1)[-1], ValueExistsError]) # duplicate last index last value
+        paras.append([arg_exist, value2, ValueExistsError])
+        paras.append([_s[arg_exist, :], item2, ValueExistsError])
+        paras.append([_s[index_exist: key_not_exist, :], item, ValueExistsError])
+
+        for index1 in [index_exist, 0]:
+            # index2 mot match value
+            paras.append([_s[index1: key_exist, [0]], [], ValueError])
+            # Indices of the new item do not match existing indices
+            paras.append([_s[index1: key_not_exist, index1], key_not_exist, ValueError])
+
+
 
         for para, val, err in paras:
             with self.assertRaises(err):
