@@ -15,19 +15,20 @@ def call(obj, func_name, *args, **kw):
     return func(*args, **kw)
 
 
-class _Slice(object):
+class EasyGetItem(object):
     '''
-    easy creating slice obj.
-    _s = _SliceObj()
+    Easily obtain the argument (e.g., slice) of __getitem__() via the bracket syntax.
+
+    _s = EasyGetItem()
     _s[1:] -> slice(1, None, None)
+    _s['a':1,'b'] -> (slice('a', 1, None), 'b')
     '''
     def __getitem__(self, arg):
         return arg
 
-    def __setitem__(self, arg, val):
-        return arg, val
 
-_s = _Slice()
+_s = EasyGetItem()
+
 
 
 
@@ -62,7 +63,7 @@ class TestMIDict_Basic(unittest.TestCase):
 
 class TestMIDict_3(unittest.TestCase):
 
-    def getData(self):
+    def get_data(self):
         items = [['jack', 1, (192,1)],
 #                 ['tony', 2, (192,2)],
                  ['alice', 3, (192,3)]]
@@ -71,7 +72,7 @@ class TestMIDict_3(unittest.TestCase):
         return d, names, items
 
     def test_getitem(self):
-        d, names, items = self.getData()
+        d, names, items = self.get_data()
         N = len(names)
         for item in items:
             # d[index1:key, index2] == val
@@ -182,7 +183,7 @@ class TestMIDict_3(unittest.TestCase):
 
 
     def test_getitem_error(self):
-        d, names, items = self.getData()
+        d, names, items = self.get_data()
         N = len(names)
         M1 = N + 10 # out of range
         M2 = -N - 10
@@ -222,7 +223,7 @@ class TestMIDict_3(unittest.TestCase):
 
     def test_setitem_nonempty(self):
         # modify existing items, construct a new MIDict, and compare with results of setitem
-        d, names, items = self.getData()
+        d, names, items = self.get_data()
         N = len(names)
         L = len(items)
 
@@ -393,26 +394,33 @@ class TestMIDict_3(unittest.TestCase):
         print cnt
 
     def test_setitem_empty(self):
-        d, names, items = self.getData()
+        d, names, items = self.get_data()
         N = len(names)
 
-        index1 = names[0]
         item = items[0]
-        key = item[0]
-        idx = 1 if N == 2 else _s[1:]
-        index2 = names[idx]
-        value = item[idx]
+        idx1 = 1 if N == 2 else _s[1:]
+        idx0 = 0 if N == 2 else _s[:-1]
+
+        index1 = names[0] # main keys
+        key = item[0 ]
+        index2 = names[idx1]
+        value = item[idx1]
 
         paras_names = []
-        paras_names.append([(_s[index1:key], index2), value, names])
+        paras_names.append([_s[index1:key, index2], value, names])
         if N > 2:
             paras_names.append([(_s[index1:key],) + tuple(index2), value, names])
 
+        default_names = ['index_%s'%(i+1) for i in range(N)]
+        paras_names.append([_s[item[0], names[1:]], item[1:], default_names[:1]+names[1:]])
+        paras_names.append([_s[:item[-1], names[:-1]], item[:-1], names[:-1]+default_names[-1:]])
+
         if N == 2:
-            paras_names.append([key, value, ['index_1', 'index_2']])
-            paras_names.append([_s[:value], key, ['index_1', 'index_2']])
+            paras_names.append([key, value, default_names])
+            paras_names.append([_s[:item[-1]], item[idx0], default_names])
             # name conflict
-            paras_names.append([_s['index_2':key], value, ['index_2', get_unique_name('index_2', ['index_2'])]])
+            default_names2 = ['index_2', get_unique_name('index_2', ['index_2'])]
+            paras_names.append([_s['index_2':key], value, default_names2])
 
         for para, val, indices in paras_names:
             d = MIDict([item], indices) # with only one item
@@ -420,12 +428,13 @@ class TestMIDict_3(unittest.TestCase):
             d2[para] = val
             self.assertEqual(d2, d, '%r :not equal: %r, d[%r] = %r' % (d, d2, para, val))
 
-
+    def test_setitem_error(self):
+        ''
 
 
 class TestMIDict_2(TestMIDict_3):
 
-    def getData(self):
+    def get_data(self):
         items = [['jack', 1],
 #                 ['tony', 2],
                  ['alice', 3]]
@@ -434,7 +443,7 @@ class TestMIDict_2(TestMIDict_3):
         return d, names, items
 
     def test_convert_dict(self):
-        d, names, items = self.getData()
+        d, names, items = self.get_data()
         for cls in [dict, OrderedDict]:
             normal_d = cls(items)
             for d_var in [d, cls(d), d.todict(cls)]:
@@ -442,7 +451,7 @@ class TestMIDict_2(TestMIDict_3):
                 self.assertEqual(normal_d, d_var)
 
     def test_compatible_dict(self):
-        d, names, items = self.getData()
+        d, names, items = self.get_data()
         dct = dict(items)
         od = OrderedDict(items)
 
