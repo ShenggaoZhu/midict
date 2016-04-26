@@ -220,7 +220,6 @@ class TestMIDict_3(unittest.TestCase):
 
 
 
-
     def test_setitem_nonempty(self):
         # modify existing items, construct a new MIDict, and compare with results of setitem
         d, names, items = self.get_data()
@@ -428,8 +427,61 @@ class TestMIDict_3(unittest.TestCase):
             d2[para] = val
             self.assertEqual(d2, d, '%r :not equal: %r, d[%r] = %r' % (d, d2, para, val))
 
+
     def test_setitem_error(self):
-        ''
+        d, names, items = self.get_data()
+        N = len(names)
+        M1 = N + 10 # out of range
+        M2 = -N - 10
+
+        index_exist = names[0]
+        index_not_exist = get_unique_name('', names)
+
+        item = items[0]
+        key_exist = item[0]
+        key_not_exist = get_unique_name('', d)
+        idx = 1 if N == 2 else _s[1:]
+        value = item[idx]
+
+        # d[index_exist:key_exist] is valid
+        d[index_exist:key_exist]
+
+        paras = []
+        for index1 in [index_not_exist, M1, M2]: # index1 not exist
+            for key in [key_exist, key_not_exist]:
+                paras.append([_s[index1:key], value, KeyError])
+
+        for index1 in [index_exist, 0]:
+            # index2 mot match value
+            paras.append([_s[index1: key_exist, [0]], [], ValueError])
+            # Indices of the new item do not match existing indices
+            paras.append([_s[index1: key_not_exist, index1], key_not_exist, ValueError])
+
+        # index2 not exist; faked matched values
+        arg_exist = _s[index_exist: key_exist]
+        for index2 in [index_not_exist, M1, M2]:
+            paras.append([(arg_exist, index2), 0, KeyError])
+            for index2_exist in [index_exist, 0]:
+                paras.append([(arg_exist, [index2, index2_exist]), [0,1], KeyError])
+                paras.append([(arg_exist, index2, index2_exist), [0,1], KeyError])
+                # extra arg after index2
+                paras.append([(arg_exist, [index2, index2_exist], index2), [0,1], KeyError])
+
+        for para, val, err in paras:
+            with self.assertRaises(err):
+                d[para] = val
+
+        # empty dict
+        d = MIDict()
+        paras = []
+        # int or slice not alllowed as index
+        paras.append([(arg_exist, 0), 0])
+        paras.append([(arg_exist, _s[1:]), [0]])
+        paras.append([(_s[0, key_exist], _s[1:]), [0]])
+
+        for para, val in paras:
+            with self.assertRaises(TypeError):
+                d[para] = val
 
 
 class TestMIDict_2(TestMIDict_3):

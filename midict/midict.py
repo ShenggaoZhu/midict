@@ -1597,11 +1597,9 @@ class MIDict(MIMapping):
         '''
         set values via multi-indexing
 
-        int/slice syntax can only change values of existing keys, not creating new keys
-
-        If ``d.indices`` is empty (i.e., no index names are set), index names
-        can be created when setting a new item with specified names (the orders of
-        the indices are defined by ``index1`` and ``index2``):
+        If ``d.indices`` is empty (i.e., no index names and no items are set), index names
+        can be created when setting a new item with specified names (``index1`` and ``index2``
+        can not be int or slice)::
 
             d = MIDict()
             d['uid':1, 'name'] = 'jack'
@@ -1612,8 +1610,8 @@ class MIDict(MIMapping):
             <==> d[:'jack'] = 1
             # d -> MIDict([(1, 'jack')], ['index_1', 'index_2'])
 
-        If ``d.indices`` is not empty, when setting a new item, all indices and values
-        must be specified:
+        If ``d.indices`` is not empty, when setting a new item, all indices of the item
+        must be specified via ``index1`` and ``index2`` (implicitly or explicitly)::
 
             d = MIDict([['jack', 1, '192.1']], ['name', 'uid', 'ip'])
             d['tony'] = [2, '192.2']
