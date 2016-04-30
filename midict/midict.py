@@ -606,10 +606,13 @@ def MI_parse_args(self, args, ingore_index2=False, allow_new=False):
     if item is None:  # allow_new. item and value are None
         return index1, key, index2, None, None
 
-    try:
-        value = mget_list(item, index2)
-    except IndexError:
-        raise KeyError('Index not found: %s' % (index2,))
+#    try:
+#        value = mget_list(item, index2)
+#    except IndexError:
+#        raise KeyError('Index not found: %s' % (index2,))
+
+    # no need to try since index2 is always returned as int or list of int
+    value = mget_list(item, index2)
     return index1, key, index2, item, value
 
 
@@ -759,17 +762,13 @@ def _MI_init(self, *args, **kw):
                 try:
                     items = items.items()
                 except TypeError:  # items() may be not callalbe
-                    if hasattr(items, 'keys'):
-                        try:
-                            items = [(k, items[k]) for k in items.keys()]
-                        except TypeError:
-                            pass
+                    pass
 
     if n_args >= 2:
-        names = args[1]
+        names = args[1] # may be None
 
     if n_args >= 3:
-        raise TypeError('At most 2 positional arguments allowed (got %s)' % n_args)
+        raise TypeError('At most 2 positional arguments allowed (%s given)' % n_args)
 
     if items:  # check item length
         n_index = len(items[0])
@@ -795,7 +794,7 @@ def _MI_init(self, *args, **kw):
                                  'length of items (%s)' % (len(names), n_index))
 
     if names is None:  # generate default names
-        names = ['index_' + str(i) for i in range(n_index)]
+        names = ['index_%s' % (i+1) for i in range(n_index)] # starts from index_1
     else:
         map(MI_check_index_name, names)
 
@@ -938,14 +937,21 @@ class MIMapping(AttrOrdDict):
             return NotImplemented
 
         lt = super(MIMapping, self).__lt__(other)
-
-        if not lt:
+        if lt is True:
+            return lt
+        elif lt is False: # equal or greater
+            if isinstance(other, MIMapping):
+                if self.items() == other.items():
+                    return self.indices.keys() < other.indices.keys()
             return False
-
-        if isinstance(other, MIMapping):
-            lt = self.indices.keys() < other.indices.keys()
-
-        return lt
+        elif lt is NotImplemented:
+            cp = super(MIMapping, self).__cmp__(other) # Python2
+            if cp < 0:
+                return True
+            if cp == 0:
+                if isinstance(other, MIMapping):
+                    return self.indices.keys() < other.indices.keys()
+            return False
 
     # use __lt__
 
@@ -962,6 +968,7 @@ class MIMapping(AttrOrdDict):
         return not self < other
 
     def __cmp__(self, other):
+        # gone in PY3
         'Return negative if self < other, zero if self == other, positive if self > other.'
         # warning: "<" causes recursion of __cmp__
 #        if self < other:
@@ -1012,21 +1019,22 @@ class MIMapping(AttrOrdDict):
         raise NotImplementedError
 
     @classmethod
-    def fromkeys(cls, keys, value=None):
+    def fromkeys(cls, keys, value=None, names=None):
         '''
-        Create a new dictionary with keys from ``keys`` and values set to value.
+        Create a new dictionary with keys from ``keys`` and values set to ``value``.
 
-        fromkeys() is a class method that returns a new dictionary. value defaults to None.
+        fromkeys() is a class method that returns a new dictionary. ``value`` defaults to None.
 
         Length of ``keys`` must not exceed one because no duplicate values are allowed.
+
+        Optional ``names`` can be provided for index names (of length 2).
         '''
-        if len(keys) > 1:
+        N = len(keys)
+        if N > 1:
             raise ValueError('Length of keys (%s) must not exceed one because '
-                             'no duplicate values are allowed' % (len(keys),))
-        self = cls()
-        if keys:
-            self[keys[0]] = value
-        return self
+                             'no duplicate values are allowed' % (N,))
+        items = [[keys[0], value]] if N == 1 else []
+        return cls(items, names)
 
     def get(self, key, default=None):
         '''
@@ -1930,14 +1938,26 @@ class MIDictView(KeysView):
         else:
             return False
 
+    def __len__(self):
+        return len(self._mapping)
+
     def __iter__(self):
         return self._mapping.iterkeys(self.index_key)
 
     def iterkeys(self):
         return iter(self)
 
-    def itervalues(self):
-        return self._mapping.iterkeys(self.index_value)
+    def itervalues(self): # single index
+        index = self.index_value
+        if self._mapping.indices:
+            if index is None:
+                index = -1
+            return self._mapping.iterkeys(index)
+        else:
+            if index is None:
+                return iter(())
+            else:
+                raise KeyError('Index not found (dictionary is empty): %s' % (index,))
 
     def iteritems(self):
         if self._mapping.indices:
@@ -1964,7 +1984,7 @@ class MIDictView(KeysView):
 ############################################
 
 
-def __test():
+def __test(): # pragma: no cover
     m = IdxOrdDict(a=1, b=2)
     m['a'] = 10
     m['a', 'b'] = [10, 20]

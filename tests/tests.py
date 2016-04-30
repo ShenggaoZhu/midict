@@ -7,10 +7,12 @@ Created on Wed Apr 20 11:13:35 2016
 #from __future__ import absolute_import
 import unittest
 from collections import OrderedDict, Counter
+import pickle
 
 
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from midict.midict import *
 
 def call(obj, func_name, *args, **kw):
@@ -19,64 +21,166 @@ def call(obj, func_name, *args, **kw):
     return func(*args, **kw)
 
 
-class EasyGetItem(object):
+class EasyArg(object):
     '''
     Easily obtain the argument (e.g., slice) of __getitem__() via the bracket syntax.
+    Easily obtain the *arg and **kw from function calls.
 
-    _s = EasyGetItem()
+    _s = EasyArg()
     _s[1:] -> slice(1, None, None)
     _s['a':1,'b'] -> (slice('a', 1, None), 'b')
+
+    _s(1,2,a=5) -> ((1, 2), {'a': 5})
     '''
     def __getitem__(self, arg):
         return arg
 
+    def __call__(self, *arg, **kw):
+        return arg, kw
 
-_s = EasyGetItem()
+_s = EasyArg()
 
 
 
+def get_data3(cls=MIDict):
+    items = [['jack', 1, (192,1)],
+             ['tony', 2, (192,2)],
+             ['alice', 3, (192,3)]]
+    names = ['name', 'uid', 'ip']
+    d = cls(items, names)
+    return d, items, names
 
+# !coverage run tests/tests.py;coverage report;coverage html
 
 #==============================================================================
 # test cases
 #==============================================================================
 
 
+class TestMIMapping(unittest.TestCase):
 
-
-class TestMIDict_Basic(unittest.TestCase):
-
-    def test_construction(self):
+    def test_init(self):
         data = []
         N_items = 3
-        for k_indices in [2, 3, 5, 10]: # number of indices
+        for k_indices in [2, 3, 9]: # number of indices
             items = []
             for n in range(N_items):
-                item = [i+n for i in range(k_indices)] # populate values
+                item = tuple([i+n for i in range(k_indices)]) # populate values
                 items.append(item)
             names = map(str, range(k_indices))
             data.append([items, names])
-        for items, names in data:
-            d = MIDict(items, names)
-            self.assertEqual(d.indices.keys(), names)
-            self.assertEqual(d.items(), [tuple(it) for it in items])
 
-    def test_construction_error(self):
-        ''
+        for items, names in data:
+            for n in [names, ''.join(names)]: # single str '012'
+                d = MIDict(items, names)
+                self.assertEqual(d.indices.keys(), names)
+                self.assertEqual(d.items(), items)
+
+        d = MIDict(items, names)
+        d2 = MIDict(d)
+        self.assertEqual(d2, d)
+
+        dct = dict(a=1, b=2, c=3)
+        d2 = MIDict(dct)
+        self.assertEqual(d2, dct)
+
+        d2 = MIDict(**dct)
+        self.assertEqual(d2, dct)
+
+        class ItemObj(object):
+            items = dct.items # callable item()
+
+        obj = ItemObj()
+        d2 = MIDict(obj)
+        self.assertEqual(d2, dct)
+
+        class ListObj(list):
+            pass
+        items_list = ListObj(dct.items())
+        items_list.items = None # not callable item
+        d2 = MIDict(items_list)
+        self.assertEqual(d2, dct)
+
+
+    def test_init_error(self):
+        d, items, names = get_data3()
+        names_dup = ['name', 'ip', 'ip']
+        names_int = list(range(3))
+        names2 = names * 2
+        items2 = items + [[1]]
+
+        paras = []
+        paras.append([_s(items, names, []), TypeError])
+        paras.append([_s(items2, names), ValueError])
+        paras.append([_s(items, names2), ValueError])
+        paras.append([_s(items, names, a=1), ValueError])
+        paras.append([_s(items, names_dup), ValueError])
+        paras.append([_s(items, names_int), TypeError])
+
+
+        for (arg, kw), err in paras:
+            with self.assertRaises(err):
+                MIDict(*arg, **kw)
+
+
+    def test_single_index(self):
+        items = [[i] for i in range(5)]
+        names = ['index']
+        d = MIDict(items, names)
+        for i in range(5):
+            self.assertEqual(d[i], i)
+            self.assertEqual(d[0:i], i)
+            self.assertEqual(d['index':i], i)
+
+    def test_mutable_methods(self):
+        d, items, names = get_data3(MIMapping)
+        key = items[0][0]
+        with self.assertRaises(NotImplementedError):
+            d[key] =[0, 1]
+
+        with self.assertRaises(NotImplementedError):
+            del d[key]
+
+        with self.assertRaises(NotImplementedError):
+            d.clear()
+
+        with self.assertRaises(NotImplementedError):
+            d.update()
+
+
+    def test_fromkeys(self):
+        for cls in [MIMapping, MIDict, FrozenMIDict]:
+            for keys in [[], [1]]:
+                for value in [None, 0]:
+                    for names in [None, ['a', 'b']]:
+                        d = cls.fromkeys(keys, value, names)
+                        self.assertEqual(d.__class__, cls)
+                        self.assertEqual(d.keys(), keys)
+                        self.assertEqual(d.values(), [value for k in keys])
+                        if keys:
+                            if names is None:
+                                names = ['index_1', 'index_2']
+                            self.assertEqual(d.indices.keys(), names)
+
+        with self.assertRaises(ValueError):
+            MIMapping.fromkeys([1,2,3])
+
+
+
 
 
 class TestMIDict_3(unittest.TestCase):
 
-    def get_data(self):
+    def get_data(self, cls=MIDict):
         items = [['jack', 1, (192,1)],
 #                 ['tony', 2, (192,2)],
                  ['alice', 3, (192,3)]]
         names = ['name', 'uid', 'ip']
-        d =  MIDict(items, names)
-        return d, names, items
+        d =  cls(items, names)
+        return d, items, names
 
     def test_getitem(self):
-        d, names, items = self.get_data()
+        d, items, names = self.get_data()
         N = len(names)
         for item in items:
             # d[index1:key, index2] == val
@@ -187,7 +291,7 @@ class TestMIDict_3(unittest.TestCase):
 
 
     def test_getitem_error(self):
-        d, names, items = self.get_data()
+        d, items, names = self.get_data()
         N = len(names)
         M1 = N + 10 # out of range
         M2 = -N - 10
@@ -215,6 +319,8 @@ class TestMIDict_3(unittest.TestCase):
                 paras.append((arg_exist, [index2, index2_exist]))
                 paras.append((arg_exist, index2, index2_exist))
                 # extra arg after index2
+                paras.append((key_exist, [index2_exist], index2))
+                paras.append((arg_exist, [index2_exist], index2))
                 paras.append((arg_exist, [index2, index2_exist], index2))
 
 
@@ -226,14 +332,14 @@ class TestMIDict_3(unittest.TestCase):
 
     def test_setitem_nonempty(self):
         # modify existing items, construct a new MIDict, and compare with results of setitem
-        d, names, items = self.get_data()
+        d, items, names = self.get_data()
         N = len(names)
         L = len(items)
 
         # cached signature and d_new
         cache_sign = []
         cache_d = []
-        cnt = Counter()
+#        cnt = Counter()
         for k_item, item_old in enumerate(items + [None]):
             # when k_item == L, item_old is None
             # complete new keys
@@ -377,7 +483,7 @@ class TestMIDict_3(unittest.TestCase):
 
                         for para in paras:
                             d2 = MIDict(items, names) # copy
-                            cnt[k_item] += 1
+#                            cnt[k_item] += 1
 
                             if not isinstance(arg, slice) and len(row) > 1:
                                 # d[key, name], d[key, i], d[key, tuple] or d[key, k1, k2...] not working
@@ -397,10 +503,10 @@ class TestMIDict_3(unittest.TestCase):
                                 raise
                             self.assertEqual(d2, d_new,
                                 '%r :not equal: %r, d[%r] = %r' % (d_new, d2, para, value))
-        print cnt
+#        print cnt
 
     def test_setitem_empty(self):
-        d, names, items = self.get_data()
+        d, items, names = self.get_data()
         N = len(names)
 
         item = items[0]
@@ -437,7 +543,7 @@ class TestMIDict_3(unittest.TestCase):
 
 
     def test_setitem_error(self):
-        d, names, items = self.get_data()
+        d, items, names = self.get_data()
         N = len(names)
         M1 = N + 10 # out of range
         M2 = -N - 10
@@ -497,40 +603,253 @@ class TestMIDict_3(unittest.TestCase):
         d = MIDict()
         paras = []
         # int or slice not alllowed as index
-        paras.append([(arg_exist, 0), 0])
-        paras.append([(arg_exist, _s[1:]), [0]])
-        paras.append([(_s[0, key_exist], _s[1:]), [0]])
+        paras.append([_s[0:0, [key_exist]], [0]])
+        paras.append([_s[0:0, 1:], [0]])
+        paras.append([_s[index_exist: key_exist, 0], 0])
+        paras.append([_s[index_exist: key_exist, 1:], [0]])
+        paras.append([_s[key_exist, [1]], [0]])
+        paras.append([_s[key_exist, 1:], [0]])
 
         for para, val in paras:
             with self.assertRaises(TypeError):
                 d[para] = val
 
+        paras = []
+        paras.append([_s[index_exist: key_exist, [index_not_exist]], [0,1]]) # len not match
+        for para, val in paras:
+            with self.assertRaises(ValueError):
+                d[para] = val
+
+
+    def test_cmp(self):
+        d, items, names = self.get_data()
+        d2 = MIDict(d)
+        dn = MIDict(items, map(str, range(len(names)))) # smaller names
+
+        items2 = [[k+i for i in range(len(items[0]))] for k in range(len(items))]
+        ds = MIDict(items2, names) # small values
+
+        dct = dict(zip(range(5),range(5)))
+
+        self.assertEqual(d, d2)
+
+        for x in [1, dn, ds, dct]:
+            self.assertNotEqual(d, x)
+        for x in [1, dn, ds]:
+            self.assertGreater(d, x)
+            self.assertGreaterEqual(d, x)
+            self.assertLess(x, d)
+            self.assertLessEqual(x, d)
+        self.assertLess(d, dct)
+        self.assertGreater(dct, d)
+
+
+    def test_repr(self):
+        for cls in [MIMapping, MIDict, FrozenMIDict]:
+            d, items, names = self.get_data(cls)
+            r = repr(d)
+            d2 = eval(r)
+            self.assertEqual(d.__class__, d2.__class__)
+            self.assertEqual(d, d2)
+            self.assertIs(d2.indices[0], d2)
+
+
+    def test_reduce(self):
+        for cls in [MIMapping, MIDict, FrozenMIDict]:
+            d, items, names = self.get_data(cls)
+            s = pickle.dumps(d)
+            d2 = pickle.loads(s)
+            self.assertEqual(d.__class__, d2.__class__)
+            self.assertEqual(d, d2)
+            self.assertIs(d2.indices[0], d2)
+
+
+    def test_copy(self):
+        d, items, names = self.get_data()
+        for d2 in [d.copy(), MIDict(d)]:
+            self.assertEqual(d.__class__, d2.__class__)
+            self.assertEqual(d, d2)
+            self.assertIs(d2.indices[0], d2)
+
+    def test_reversed(self):
+        d, items, names = self.get_data()
+
+        self.assertEqual(list(reversed(d)), d.keys()[::-1])
+
+        for index in names:
+            keys = d.keys(index)
+            rev = list(d.__reversed__(index))
+            self.assertEqual(rev, keys[::-1])
+
+        d = MIMapping() # empty
+        self.assertEqual(list(reversed(d)), d.keys()[::-1])
+        with self.assertRaises(KeyError):
+            d.__reversed__(0)
+
+    def test_keys_values_items(self):
+        d, items, names = self.get_data()
+        N = len(names)
+
+        items = [tuple(it) for it in items]
+        item_exist = items[0]
+        item_not_exist = tuple(get_unique_name('', d.values(i)) for i in names)
+
+        keys = [it[0] for it in items]
+        key_exist = keys[0]
+        key_not_exist = get_unique_name('', keys)
+
+        if N == 2:
+            values = [it[1] for it in items]
+            value_not_exist = get_unique_name('', values)
+        else:
+            values = [tuple(it[1:]) for it in items]
+            value_not_exist = tuple(get_unique_name('', d.values(i)) for i in names[1:])
+        value_exist = values[0]
+
+        funcs = ['keys', 'values', 'items']
+        funcs_views = ['viewkeys', 'viewvalues', 'viewitems']
+        gt_data = [keys, values, items]
+        test_data = [[key_exist, key_not_exist], [value_exist, value_not_exist],
+                     [item_exist, item_not_exist]]
+        # check gt
+        for f, fv, gt, test in zip(funcs, funcs_views, gt_data, test_data):
+            self.assertEqual(call(d, f), gt)
+            self.assertEqual(list(call(d, fv)), gt)
+
+            v_exist, v_not_exist = test
+            for fn in [f, fv]:
+                self.assertIn(v_exist, call(d, fn))
+                self.assertNotIn(v_not_exist, call(d, fn))
+
+        # use index
+        for k in range(N):
+            gt = [it[k] for it in items]
+            for i in [k, names[k]]:
+                for f in funcs + funcs_views:
+                    self.assertEqual(list(call(d, f, i)), gt)
+
+        index_not_exist = get_unique_name('', names)
+        for i in [index_not_exist, N + 10, -N - 10]:
+            for f in funcs + funcs_views:
+                with self.assertRaises(KeyError):
+                    list(call(d, f, i))
+
+        # empty
+        d = MIDict()
+        gt_data = [[], [], []]
+        for f, fv, gt in zip(funcs, funcs_views, gt_data):
+            self.assertEqual(call(d, f), gt)
+            self.assertEqual(list(call(d, fv)), gt)
+            v_not_exist = None
+            for fn in [f, fv]:
+                self.assertNotIn(v_not_exist, call(d, fn))
+
+        for i in [index_not_exist, N + 10, -N - 10]:
+            for f in funcs + funcs_views:
+                with self.assertRaises(KeyError):
+                    list(call(d, f, i))
+
+
+    def test_viewdict(self):
+        d, items0, names = self.get_data()
+        idx = [[None, None], [0, -1], [-1, 0], [0, 1], [1, 0], [0, 0], [1, 1]]
+        for i_key, i_value in idx:
+            v = d.viewdict(i_key, i_value)
+            if i_key is None:
+                i_key = 0
+            if i_value is None:
+                i_value = -1
+            keys = [it[i_key] for it in items0]
+            values = [it[i_value] for it in items0]
+            items = zip(keys, values)
+            key_exist = keys[0]
+            key_not_exist = get_unique_name('', keys)
+
+            self.assertEqual(v.keys(), keys)
+            self.assertEqual(list(v), keys)
+            self.assertEqual(v.values(), values)
+            self.assertEqual(v.items(), items)
+            self.assertIn(key_exist, v)
+            self.assertNotIn(key_not_exist, v)
+
+        r = repr(v)
+        v2 = eval(r)
+        self.assertEqual(v2.index_key, v.index_key)
+        self.assertEqual(v2.index_value, v.index_value)
+        self.assertEqual(v2._mapping, v._mapping)
+
+        with self.assertRaises(KeyError):
+            d.viewdict(len(names) + 10)
+
+        d = MIDict()
+        v = d.viewdict()
+        self.assertEqual(v.keys(), [])
+        self.assertEqual(list(v), [])
+        self.assertEqual(v.values(), [])
+        self.assertEqual(v.items(), [])
+        self.assertNotIn(None, v)
+
+        with self.assertRaises(KeyError):
+            d.viewdict(0, 1)
+
+
+
+
+#        funcs = ['__len__', ]
+#        for d2 in [dct, od]:
+#            for f in funcs:
+#                self.assertEqual(call(d, f), call(d2, f))
+#
+#        funcs_ordered = ['keys', 'values', 'items']
+#        for f in funcs_ordered:
+#            self.assertItemsEqual(call(d, f), call(dct, f))
+#            self.assertEqual(call(d, f), call(od, f))
+#
+#        funcs_ordered_views = ['viewkeys', 'viewvalues', 'viewitems']
+#        test_data = [[key_exist, key_not_exist], [value_exist, value_not_exist],
+#                     [item_exist, item_not_exist]]
+#        for f, data in zip(funcs_ordered_views, test_data):
+#            self.assertItemsEqual(list(call(d, f)), list(call(dct, f)))
+#            self.assertEqual(list(call(d, f)), list(call(od, f)))
+#            for x in data:
+#                self.assertEqual(x in call(d, f), x in call(dct, f))
+#                self.assertEqual(x in call(d, f), x in call(od, f))
+
+
 
 class TestMIDict_2(TestMIDict_3):
 
-    def get_data(self):
+    def get_data(self, cls=MIDict):
         items = [['jack', 1],
 #                 ['tony', 2],
                  ['alice', 3]]
         names = ['name', 'uid']
-        d =  MIDict(items, names)
-        return d, names, items
+        d =  cls(items, names)
+        return d, items, names
 
     def test_convert_dict(self):
-        d, names, items = self.get_data()
-        for cls in [dict, OrderedDict]:
-            normal_d = cls(items)
-            for d_var in [d, cls(d), d.todict(cls)]:
-                self.assertEqual(d_var, normal_d)
-                self.assertEqual(normal_d, d_var)
+        d1, items, names = self.get_data()
+        d0 = MIDict()
+        for d in [d1, d0]:
+            for cls in [dict, OrderedDict]:
+                normal_d = cls(d.items())
+                for d_var in [d, cls(d), d.todict(cls)]:
+                    self.assertEqual(d_var, normal_d)
+                    self.assertEqual(normal_d, d_var)
+
+
 
     def test_compatible_dict(self):
-        d, names, items = self.get_data()
+        d, items, names = self.get_data()
         dct = dict(items)
         od = OrderedDict(items)
 
         key_exist = d.keys()[0]
         key_not_exist = get_unique_name('', d)
+        value_exist = d.values()[0]
+        value_not_exist = get_unique_name('', d.values())
+        item_exist = d.items()[0]
+        item_not_exist = (key_not_exist, value_not_exist)
 
         funcs = ['__len__', ]
         for d2 in [dct, od]:
@@ -543,9 +862,16 @@ class TestMIDict_2(TestMIDict_3):
             self.assertEqual(call(d, f), call(od, f))
 
         funcs_ordered_views = ['viewkeys', 'viewvalues', 'viewitems']
-        for f in funcs_ordered_views:
+        test_data = [[key_exist, key_not_exist], [value_exist, value_not_exist],
+                     [item_exist, item_not_exist]]
+        for f, data in zip(funcs_ordered_views, test_data):
             self.assertItemsEqual(list(call(d, f)), list(call(dct, f)))
             self.assertEqual(list(call(d, f)), list(call(od, f)))
+            for x in data:
+                self.assertEqual(x in call(d, f), x in call(dct, f))
+                self.assertEqual(x in call(d, f), x in call(od, f))
+
+
 
         funcs_key = ['__contains__', 'has_key', 'get']
         for d2 in [dct, od]:
