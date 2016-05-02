@@ -167,9 +167,76 @@ class TestMIMapping(unittest.TestCase):
 
 
 
+class TestFrozenMIDict(unittest.TestCase):
+    def test_convert(self):
+        for cls in [MIMapping, MIDict]:
+            d, items, names = get_data3(cls)
+            for df in [FrozenMIDict(items, names), FrozenMIDict(d)]:
+                self.assertEqual(d, df)
+
+    def test_hash(self):
+        d, items, names = get_data3(FrozenMIDict)
+        {d:d}
+        set([d, d])
 
 
-class TestMIDict_3(unittest.TestCase):
+class TestBasic(unittest.TestCase):
+    def test_od_replace_key(self):
+        keys0 = list(range(10))
+        od0 = OrderedDict.fromkeys(keys0)
+
+        keys = list(keys0)
+        i = 5 # single
+        i2 = 50
+        value = 'new value'
+        keys[i] = i2
+        od = od0.copy()
+        od_replace_key(od, i, i2, value)
+        self.assertEqual(od.keys(), keys)
+        self.assertEqual(od[i2], value)
+
+        keys = list(keys0)
+        i = 5 # single
+        i2 = 6 # overwrite
+        keys.remove(i2)
+        keys[i] = i2
+        od = od0.copy()
+        od_replace_key(od, i, i2)
+        self.assertEqual(od.keys(), keys)
+
+        keys = list(keys0)
+        i = [5, 6] # multi
+        i2 = [50, 60]
+        value = ['new value 1', 'new value 2']
+        mset_list(keys, i, i2)
+        od = od0.copy()
+        od_replace_key(od, i, i2, value)
+        self.assertEqual(od.keys(), keys)
+        for k,v in zip(i2, value):
+            self.assertEqual(od[k], v)
+
+        with self.assertRaises(ValueError):
+            od_replace_key(od, [1], [1,2]) # len not equal
+
+        with self.assertRaises(ValueError):
+            od_replace_key(od, [1], [10], [1, 2]) # len not equal
+
+    def test_AttrDict(self):
+        d = AttrDict()
+        self.assertTrue(hasattr(d, '_AttrDict__attr2item'))
+
+        d.a = 1
+        d.b = 2
+        delattr(d, 'a')
+        del d['b']
+        self.assertEqual(d, AttrDict())
+        delattr(d, '_AttrDict__attr2item')
+
+#==============================================================================
+# test MIDict
+#==============================================================================
+
+class TestMIDict_3_Indices(unittest.TestCase):
 
     def get_data(self, cls=MIDict):
         items = [['jack', 1, (192,1)],
@@ -620,6 +687,68 @@ class TestMIDict_3(unittest.TestCase):
             with self.assertRaises(ValueError):
                 d[para] = val
 
+    def test_delitem(self):
+        d, items, names = self.get_data()
+        N = len(names)
+        L = len(items)
+        for k_item, item in enumerate(items):
+            items_new = [items[k] for k in range(L) if k!= k_item]
+            d_new = MIDict(items_new, names)
+            for i, (index1, key) in enumerate(zip(names, item)):
+                # all possible syntax for [index1:key] part
+                args = []
+                args.append(_s[index1: key])
+                args.append(_s[i: key])
+                args.append(_s[-N+i: key])
+                if i == 0:
+                    args.append(key)
+                if i == N-1:
+                    args.append(_s[:key])
+
+                for arg in args:
+                    d2 = d.copy()
+                    del d2[arg]
+                    self.assertEqual(d2, d_new)
+
+    def test_delitem_error(self):
+        d, items, names = self.get_data()
+        d0 = MIDict()
+
+        N = len(names)
+        M1 = N + 10 # out of range
+        M2 = -N - 10
+
+        index_exist = names[0]
+        index_not_exist = get_unique_name('', names)
+        key_exist = d.keys()[0]
+        key_not_exist = get_unique_name('', d)
+
+        # d[index_exist:key_exist] is valid
+        d[index_exist:key_exist]
+
+        paras = []
+        for index1 in [index_not_exist, M1, M2]: # index not exist
+            for key in [key_exist, key_not_exist]:
+                paras.append(_s[index1:key])
+
+        for index1 in [index_exist, 0]:
+            paras.append(_s[index1: key_not_exist]) # only key not exist
+
+        for para in paras:
+            for dct in [d, d0]:
+                with self.assertRaises(KeyError):
+                    del dct[para]
+
+        # add index2
+        paras = []
+        paras.append(_s[index_exist:key_exist, []])
+        paras.append(_s[index_exist:key_exist, :])
+        paras.append(_s[index_exist:key_exist, 0])
+
+        for para in paras:
+            with self.assertRaises(TypeError): # unhashable type
+                del d[para]
+
 
     def test_cmp(self):
         d, items, names = self.get_data()
@@ -792,32 +921,154 @@ class TestMIDict_3(unittest.TestCase):
         with self.assertRaises(KeyError):
             d.viewdict(0, 1)
 
+    def test_clear(self):
+        d0, items, names = self.get_data()
+        d = d0.copy()
+        d.clear() # index names still exist
+        self.assertEqual(d, MIDict([], names))
+
+        d = d0.copy()
+        d.clear(clear_indices=True)
+        self.assertEqual(d, MIDict())
+
+    def test_update(self):
+        d, items, names = self.get_data()
+        N = len(names)
+        L = len(items)
+        for k in range(L+1):
+            d2 = MIDict(items[:k], names)
+            d2.update(items[k:])
+            self.assertEqual(d2, d)
+
+        # assign index names too
+        d2 = MIDict()
+        d2.update(d)
+        self.assertEqual(d2, d)
+
+        d2 = MIDict()
+        d2.update(items, names)
+        self.assertEqual(d2, d)
+
+        with self.assertRaises(ValueError):
+            d.update(items, names) # no names allowed
+
+        with self.assertRaises(ValueError):
+            items2 = [list(range(N+1))] # len not equal
+            d.update(items2)
+
+    def test_rename_index(self):
+        d, items, names = self.get_data()
+        N = len(names)
+        names2 = map(str, range(N))
+
+        d2 = d.copy()
+        d2.rename_index(names2)
+        self.assertEqual(d2.indices.keys(), names2)
+
+        paras = []
+        for k in range(N):
+            paras.append([k, k])
+            paras.append([names[k], k])
+
+        for k in range(N+1):
+            paras.append([_s[:k], _s[:k]])
+            paras.append([names[:k], _s[:k]])
+
+        for i_old, idx in paras:
+            i_new = names2[idx]
+            names_new = list(names)
+            mset_list(names_new, idx, mget_list(names2, idx))
+            d2 = d.copy()
+            d2.rename_index(i_old, i_new)
+            self.assertEqual(d2.indices.keys(), names_new)
+
+        with self.assertRaises(ValueError):
+            d.rename_index(names[:0], names2) # len not equal
+
+        with self.assertRaises(ValueError):
+            d.rename_index(map(str, range(N+10))) # len not equal
+
+        with self.assertRaises(ValueError):
+            d.rename_index([''] * N) # duplicate names
 
 
+    def test_reorder_indices(self):
+        d, items, names = self.get_data()
+        N = len(names)
 
-#        funcs = ['__len__', ]
-#        for d2 in [dct, od]:
-#            for f in funcs:
-#                self.assertEqual(call(d, f), call(d2, f))
-#
-#        funcs_ordered = ['keys', 'values', 'items']
-#        for f in funcs_ordered:
-#            self.assertItemsEqual(call(d, f), call(dct, f))
-#            self.assertEqual(call(d, f), call(od, f))
-#
-#        funcs_ordered_views = ['viewkeys', 'viewvalues', 'viewitems']
-#        test_data = [[key_exist, key_not_exist], [value_exist, value_not_exist],
-#                     [item_exist, item_not_exist]]
-#        for f, data in zip(funcs_ordered_views, test_data):
-#            self.assertItemsEqual(list(call(d, f)), list(call(dct, f)))
-#            self.assertEqual(list(call(d, f)), list(call(od, f)))
-#            for x in data:
-#                self.assertEqual(x in call(d, f), x in call(dct, f))
-#                self.assertEqual(x in call(d, f), x in call(od, f))
+        a = list(range(N))
+        paras = []
+        paras.append(a) # different orders
+        paras.append(a[::-1])
+        paras.append(a[::2] + a[1::2])
+        paras.append(a[N//2:] + a[:N//2])
+        for idx in paras:
+            names2 = mget_list(names, idx)
+            for order in [idx, names2]:
+                d2 = d.copy()
+                d2.reorder_indices(order)
+                self.assertEqual(d2.indices.keys(), names2)
+
+        with self.assertRaises(KeyError):
+            d.reorder_indices([]) # len not equal
+
+        d2 = MIDict()
+        d2.reorder_indices([])
+        self.assertEqual(d2.indices.keys(), [])
+
+    def test_add_index(self):
+        d, items, names = self.get_data()
+        N = len(names)
+        L = len(items)
+
+        d0 = MIDict()
+        for k in range(N):
+            values = [it[k] for it in items]
+            d0.add_index(values, names[k])
+        self.assertEqual(d0, d)
+
+        d2 = MIDict(items) # default index names
+        d0 = MIDict()
+        for k in range(N):
+            values = [it[k] for it in items]
+            d0.add_index(values)
+        self.assertEqual(d0, d2)
+
+        with self.assertRaises(ValueError):
+            d.add_index([0] * L) # duplicate values
+
+        with self.assertRaises(ValueError):
+            d.add_index(list(range(L + 10))) # len not equal
+
+        with self.assertRaises(ValueError):
+            d.add_index(list(range(L)), names[0]) # duplicate index name
 
 
+    def test_remove_index(self):
+        d, items, names = self.get_data()
+        N = len(names)
+        d0 = MIDict()
 
-class TestMIDict_2(TestMIDict_3):
+        d2 = d.copy()
+        for index in names:
+            d2.remove_index(index)
+        self.assertEqual(d2, d0)
+
+        d2 = d.copy()
+        for index in range(N-1, -1, -1):
+            d2.remove_index(index)
+        self.assertEqual(d2, d0)
+
+        d2 = d.copy()
+        d2.remove_index(names)
+        self.assertEqual(d2, d0)
+
+        d2 = d.copy()
+        d2.remove_index(list(range(N)))
+        self.assertEqual(d2, d0)
+
+
+class TestMIDict_2_Indices(TestMIDict_3_Indices):
 
     def get_data(self, cls=MIDict):
         items = [['jack', 1],
@@ -888,6 +1139,8 @@ class TestMIDict_2(TestMIDict_3):
                 exc_types.append(type(e))
         for t in exc_types[1:]:
             self.assertEqual(exc_types[0], t)
+
+
 
 
 if __name__ == '__main__':

@@ -61,7 +61,8 @@ def od_replace_key(od, key, new_key, *args, **kw):
     dict.__setitem__(od, new_key, value)
 
 
-def od_reorder_keys(od, keys_in_new_order):
+
+def od_reorder_keys(od, keys_in_new_order): # not used # pragma: no cover
     '''
     Reorder the keys in an OrderedDict ``od`` in-place.
     '''
@@ -149,7 +150,7 @@ class AttrDict(dict):
 
 
 
-def convert_dict(d, cls=AttrDict):
+def convert_dict(d, cls=AttrDict): # not used # pragma: no cover
     '''
     recursively convert a normal Mapping `d` and it's values to a specified type
     (defaults to AttrDict)
@@ -199,7 +200,7 @@ def _key_to_index(keys, key, single_only=False):
                 pass
 #            return slice(start, stop, step)
             args = slice(start, stop, step).indices(len(keys))
-            return range(*args) # list of indices
+            return list(range(*args)) # list of indices
     try:
         return keys.index(key)
     except ValueError: # not IndexError
@@ -1696,33 +1697,6 @@ class MIDict(MIMapping):
             # use __setitem__() to handle duplicate
             self[key] = d[key]
 
-#        primary_index = names[0]
-#
-#        for item in d.items():
-#            item_d = IdxOrdDict(zip(names, item))
-#
-#            for index, value in zip(names, item):
-#                index_d = self.indices[index]
-#                if value in index_d:
-#                    if index == primary_index:  # primary key; replace item
-#                        item_d_old = index_d[value]
-#                        item_old = item_d_old.values()
-#                        for n, v_old, v_new in zip(names[1:], item_old[1:], item[1:]):
-#                            if v_new in self.indices[n] and v_new != v_old:
-#                                raise ValueError('Partially duplicate items not allowed: '
-#                                                 '%s and %s' %
-#                                                 (self.indices[n][v_new].values(), item))
-#
-#                        item_d_old[names] = item  # update to new values
-#                        for n, v_old, v_new in zip(names[1:], item_old[1:], item[1:]):
-#                            od_replace_key(self.indices[n], v_old, v_new)
-#                        break  # finished updating this item
-#
-#                    else:  # not in primary_index
-#                        raise ValueExistsError(value, index)
-#            else:  # no break; valid item_d
-#                for index, value in zip(names, item):
-#                    self.indices[index][value] = item_d
 
     ############################################
     # additional methods to handle index
@@ -1771,8 +1745,8 @@ class MIDict(MIMapping):
         if set(old_indices) != set(indices_order):
             raise KeyError('Keys in the new order do not match existing keys')
 
-        if len(old_indices) == 0:
-            return
+#        if len(old_indices) == 0: # already return since indices_order must equal to old_indices
+#            return
 
         # must have more than 1 index to reorder
         new_idx = [old_indices.index(i) for i in indices_order]
@@ -1793,7 +1767,7 @@ class MIDict(MIMapping):
                              'length of existing items (%s)' % (len(values), len(self)))
 
         if name is None:
-            name = 'index_' + str(len(d))
+            name = 'index_' + str(len(d)+1)
             name = get_unique_name(name, d)
         else:
             MI_check_index_name(name)
@@ -1813,8 +1787,8 @@ class MIDict(MIMapping):
 
     def remove_index(self, index):
         'remove one or more indices'
-        index_rm = _key_to_index(self.indices.keys(), index)
-        if isinstance(index_rm, int):
+        index_rm, single = convert_key_to_index(self.indices.keys(), index)
+        if single:
             index_rm = [index_rm]
 
         index_new = [i for i in range(len(self.indices)) if i not in index_rm]
