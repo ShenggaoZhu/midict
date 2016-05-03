@@ -4,10 +4,31 @@ Created on Fri Feb 19 22:46:14 2016
 
 @author: shenggao
 """
+from __future__ import absolute_import, division, print_function #, unicode_literals
+import sys
 
-from collections import (Hashable, ItemsView, KeysView, Mapping, OrderedDict, ValuesView,
-                         _get_ident)
-from types import NoneType
+PY2 = sys.version_info[0] == 2
+PY3 = sys.version_info[0] == 3
+
+from collections import Hashable, ItemsView, KeysView, Mapping, OrderedDict, ValuesView
+
+NoneType = type(None)
+
+if PY2:
+    from threading import _get_ident
+    string_types = str, unicode
+else:
+    from threading import get_ident as _get_ident
+    string_types = str, bytes
+    _map = map
+    map = lambda *args: list(_map(*args)) # always return a list
+    
+def force_list(a):
+    'force an iterable ``a`` into a list if it is not a list'
+    if isinstance(a, list):
+        return a
+    return list(a)
+
 
 
 def od_replace_key(od, key, new_key, *args, **kw):
@@ -200,7 +221,7 @@ def _key_to_index(keys, key, single_only=False):
                 pass
 #            return slice(start, stop, step)
             args = slice(start, stop, step).indices(len(keys))
-            return list(range(*args)) # list of indices
+            return force_list(range(*args)) # list of indices
     try:
         return keys.index(key)
     except ValueError: # not IndexError
@@ -240,7 +261,7 @@ def convert_index_to_keys(d, item):
     to a single key or a list of keys.
     '''
 
-    keys = d.keys()
+    keys = force_list(d.keys())
     # use KeyError for compatibility of normal use
 
     # Warning: int item will be interpreted as the index rather than key!!
@@ -432,8 +453,8 @@ class ValueExistsError(KeyError, MIMappingError):
 
 def MI_check_index_name(name):
     'Check if index name is a valid str or unicode'
-    if not isinstance(name, (str, unicode)):
-        raise TypeError('Index name must be a str or unicode. '
+    if not isinstance(name, string_types):
+        raise TypeError('Index name must be a string. '
                         'Found type %s for %s' % (type(name), name))
 
 
@@ -489,7 +510,7 @@ def MI_parse_args(self, args, ingore_index2=False, allow_new=False):
     if empty and not allow_new:
         raise KeyError('Item not found (dictionary is empty): %s' % (args,))
 
-    names = self.indices.keys()
+    names = force_list(self.indices.keys())
 
     Nargs = len(args) if isinstance(args, tuple) else 1
 
@@ -597,7 +618,7 @@ def MI_parse_args(self, args, ingore_index2=False, allow_new=False):
         if len(names) == 1:
             index2 = 0  # index2 defaults to the only one index
         else:
-            index2 = range(len(names))
+            index2 = force_list(range(len(names)))
             index2.remove(index1)
             if len(index2) == 1:  # single index
                 index2 = index2[0]
@@ -636,7 +657,7 @@ def mset_list(item, index, value):
 
 def MI_get_item(self, key, index=0):
     'return list of item'
-    index = _key_to_index_single(self.indices.keys(), index)
+    index = _key_to_index_single(force_list(self.indices.keys()), index)
     if index != 0:
         key = self.indices[index][key]  # always use first index key
     # key must exist
@@ -679,7 +700,7 @@ def _MI_setitem(self, args, value):
         return
 
     index1, key, index2, item, old_value = MI_parse_args(self, args, allow_new=True)
-    names = indices.keys()
+    names = force_list(indices.keys())
     is_new_key = item is None
     single = isinstance(index2, int)
 
@@ -757,12 +778,12 @@ def _MI_init(self, *args, **kw):
 
         if isinstance(items, Mapping):  # copy from dict
             if isinstance(items, MIMapping):
-                names = items.indices.keys()  # names may be overwritten by second arg
-            items = items.items()
+                names = force_list(items.indices.keys())  # names may be overwritten by second arg
+            items = force_list(items.items())
         else:  # try to get data from items() or keys() method
             if hasattr(items, 'items'):
                 try:
-                    items = items.items()
+                    items = force_list(items.items())
                 except TypeError:  # items() may be not callalbe
                     pass
 
@@ -916,7 +937,7 @@ class MIMapping(AttrOrdDict):
             return False
 
         if isinstance(other, MIMapping):
-            eq = self.indices.keys() == other.indices.keys()
+            eq = force_list(self.indices.keys()) == force_list(other.indices.keys())
 
         return eq # ignore indices
 
@@ -945,7 +966,7 @@ class MIMapping(AttrOrdDict):
             # equal or greater
             if isinstance(other, MIMapping):
                 if self.items() == other.items():
-                    return self.indices.keys() < other.indices.keys()
+                    return force_list(self.indices.keys()) < force_list(other.indices.keys())
             return False
         elif lt is NotImplemented:
             cp = super(MIMapping, self).__cmp__(other) # Python2
@@ -953,7 +974,7 @@ class MIMapping(AttrOrdDict):
                 return True
             if cp == 0:
                 if isinstance(other, MIMapping):
-                    return self.indices.keys() < other.indices.keys()
+                    return force_list(self.indices.keys()) < force_list(other.indices.keys())
             return False
 
     # use __lt__
@@ -987,7 +1008,7 @@ class MIMapping(AttrOrdDict):
         try:
             try:
                 if self.indices:
-                    names = self.indices.keys()
+                    names = force_list(self.indices.keys())
                     return '%s(%s, %s)' % (self.__class__.__name__, self.items(), names)
             except AttributeError: # pragma: no cover
                 # may not have attr ``indices`` yet
@@ -998,8 +1019,8 @@ class MIMapping(AttrOrdDict):
 
     def __reduce__(self):
         'Return state information for pickling'
-        items = self.items()
-        names = self.indices.keys()
+        items = force_list(self.items())
+        names = force_list(self.indices.keys())
         inst_dict = vars(self).copy() # additional state/__dict__
         for k in vars(self.__class__()):
             inst_dict.pop(k, None)
@@ -1147,7 +1168,7 @@ class MIMapping(AttrOrdDict):
                 index = slice(1, None)
                 single = False
         else:
-            index, single = convert_key_to_index(self.indices.keys(), index)
+            index, single = convert_key_to_index(force_list(self.indices.keys()), index)
 
         multi = not single
 
@@ -1169,12 +1190,12 @@ class MIMapping(AttrOrdDict):
     def iteritems(self, indices=None):
         'Return an iterator through items in the ``indices`` (defaults to all indices)'
         if indices is None:
-            indices = self.indices.keys()
+            indices = force_list(self.indices.keys())
         return self.itervalues(indices)
 
     def items(self, indices=None):
         'Return a copy list of items in the ``indices`` (defaults to all indices)'
-        return list(self.iteritems(indices))
+        return force_list(self.iteritems(indices))
 
     def update(self, *args, **kw):
         '''
@@ -1689,7 +1710,7 @@ class MIDict(MIMapping):
         if not d.indices:
             return
 
-        names = self.indices.keys()
+        names = force_list(self.indices.keys())
 
         if len(d.indices) != len(names):
             raise ValueError('Length of update items (%s) does not match '
@@ -1716,7 +1737,7 @@ class MIDict(MIMapping):
         '''
         if len(args) == 1:
             new_indices = args[0]
-            old_indices = self.indices.keys()
+            old_indices =force_list(self.indices.keys())
         else:
             old_indices, new_indices = args
             old_indices, single = convert_index_to_keys(self.indices, old_indices)
@@ -1740,7 +1761,7 @@ class MIDict(MIMapping):
         'reorder all the indices'
         # allow mixed index syntax like int
         indices_order, single = convert_index_to_keys(self.indices, indices_order)
-        old_indices = self.indices.keys()
+        old_indices = force_list(self.indices.keys())
 
         if indices_order == old_indices: # no changes
             return
@@ -1782,7 +1803,7 @@ class MIDict(MIMapping):
         else:
             items = [i+(v,) for i, v in zip(self.items(), values)]
 
-        names = d.keys() + [name]
+        names = force_list(d.keys()) + [name]
 
         self.clear(True)
         _MI_init(self, items, names)
@@ -1790,7 +1811,7 @@ class MIDict(MIMapping):
 
     def remove_index(self, index):
         'remove one or more indices'
-        index_rm, single = convert_key_to_index(self.indices.keys(), index)
+        index_rm, single = convert_key_to_index(force_list(self.indices.keys()), index)
         if single:
             index_rm = [index_rm]
 
@@ -1800,7 +1821,7 @@ class MIDict(MIMapping):
             self.clear(True)
             return
 
-        names = mget_list(self.indices.keys(), index_new)
+        names = mget_list(force_list(self.indices.keys()), index_new)
         items = [mget_list(i, index_new) for i in self.items()]
         self.clear(True)
         _MI_init(self, items, names)
@@ -2016,12 +2037,12 @@ def __test(): # pragma: no cover
 
     d = FrozenMIDict([[1, 'jack'], [2, 'tony'], [3, 'tom']], ['uid', 'name'])
 
-    print getsizeof(od)
-    print getsizeof(d)
-    print getsizeof(d.indices)
-    print getsizeof(d.indices[0])
-    print getsizeof(d.indices[-1])
-    print getsizeof(d.indices[0].values()[0])
+    print( getsizeof(od) )
+    print( getsizeof(d) )
+    print( getsizeof(d.indices) )
+    print( getsizeof(d.indices[0]) )
+    print( getsizeof(d.indices[-1]) )
+    print( getsizeof(d.indices[0].values()[0]) )
     '''
 408
 488

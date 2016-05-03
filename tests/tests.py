@@ -4,16 +4,17 @@ Created on Wed Apr 20 11:13:35 2016
 
 @author: Shenggao
 """
-#from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function #, unicode_literals
+
 import unittest
-from collections import OrderedDict, Counter
+from collections import OrderedDict
 import pickle
 
-
 import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from midict.midict import *
+
 
 def call(obj, func_name, *args, **kw):
     'call function by `func_name` of obj'
@@ -69,7 +70,7 @@ class TestBasic(unittest.TestCase):
         keys[i] = i2
         od = od0.copy()
         od_replace_key(od, i, i2, value)
-        self.assertEqual(od.keys(), keys)
+        self.assertEqual(list(od.keys()), keys)
         self.assertEqual(od[i2], value)
 
         keys = list(keys0)
@@ -79,7 +80,7 @@ class TestBasic(unittest.TestCase):
         keys[i] = i2
         od = od0.copy()
         od_replace_key(od, i, i2)
-        self.assertEqual(od.keys(), keys)
+        self.assertEqual(list(od.keys()), keys)
 
         keys = list(keys0)
         i = [5, 6] # multi
@@ -88,7 +89,7 @@ class TestBasic(unittest.TestCase):
         mset_list(keys, i, i2)
         od = od0.copy()
         od_replace_key(od, i, i2, value)
-        self.assertEqual(od.keys(), keys)
+        self.assertEqual(list(od.keys()), keys)
         for k,v in zip(i2, value):
             self.assertEqual(od[k], v)
 
@@ -103,7 +104,7 @@ class TestBasic(unittest.TestCase):
         od = OrderedDict.fromkeys(keys)
         keys2 = keys[::-1]
         od_reorder_keys(od, keys2)
-        self.assertEqual(od.keys(), keys2)
+        self.assertEqual(list(od.keys()), keys2)
 
         with self.assertRaises(KeyError):
             od_reorder_keys(od, [])
@@ -192,7 +193,7 @@ class TestMIMapping(unittest.TestCase):
         for items, names in data:
             for n in [names, ''.join(names)]: # single str '012'
                 d = MIDict(items, names)
-                self.assertEqual(d.indices.keys(), names)
+                self.assertEqual(list(d.indices.keys()), names)
                 self.assertEqual(d.items(), items)
 
         d = MIDict(items, names)
@@ -274,12 +275,12 @@ class TestMIMapping(unittest.TestCase):
                     for names in [None, ['a', 'b']]:
                         d = cls.fromkeys(keys, value, names)
                         self.assertEqual(d.__class__, cls)
-                        self.assertEqual(d.keys(), keys)
-                        self.assertEqual(d.values(), [value for k in keys])
+                        self.assertEqual(list(d.keys()), keys)
+                        self.assertEqual(list(d.values()), [value for k in keys])
                         if keys:
                             if names is None:
                                 names = ['index_1', 'index_2']
-                            self.assertEqual(d.indices.keys(), names)
+                            self.assertEqual(list(d.indices.keys()), names)
 
         with self.assertRaises(ValueError):
             MIMapping.fromkeys([1,2,3])
@@ -373,7 +374,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
                     start_top_arr = [[], []]
                     for k, arr in zip([index2.start, index2.stop], start_top_arr):
                         arr.append(k)
-                        if -N <= k < N:
+                        if isinstance(k, int) and -N <= k < N:
                             arr.append(names[k])
                     step = index2.step
                     for start in start_top_arr[0]:
@@ -434,7 +435,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
 
         index_exist = names[0]
         index_not_exist = get_unique_name('', names)
-        key_exist = d.keys()[0]
+        key_exist = list(d.keys())[0]
         key_not_exist = get_unique_name('', d)
 
         # d[index_exist:key_exist] is valid
@@ -540,7 +541,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
                         start_top_arr = [[], []]
                         for k, arr in zip([index2.start, index2.stop], start_top_arr):
                             arr.append(k)
-                            if -N <= k < N:
+                            if isinstance(k, int) and -N <= k < N:
                                 arr.append(names[k])
                         step = index2.step
                         for start in start_top_arr[0]:
@@ -791,7 +792,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
 
         index_exist = names[0]
         index_not_exist = get_unique_name('', names)
-        key_exist = d.keys()[0]
+        key_exist = list(d.keys())[0]
         key_not_exist = get_unique_name('', d)
 
         # d[index_exist:key_exist] is valid
@@ -876,7 +877,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
     def test_reversed(self):
         d, items, names = self.get_data()
 
-        self.assertEqual(list(reversed(d)), d.keys()[::-1])
+        self.assertEqual(list(reversed(d)), list(d.keys())[::-1])
 
         for index in names:
             keys = d.keys(index)
@@ -884,7 +885,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
             self.assertEqual(rev, keys[::-1])
 
         d = MIMapping() # empty
-        self.assertEqual(list(reversed(d)), d.keys()[::-1])
+        self.assertEqual(list(reversed(d)), list(d.keys())[::-1])
         with self.assertRaises(KeyError):
             d.__reversed__(0)
 
@@ -963,7 +964,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
                 i_value = -1
             keys = [it[i_key] for it in items0]
             values = [it[i_value] for it in items0]
-            items = zip(keys, values)
+            items = list(zip(keys, values))
             key_exist = keys[0]
             key_not_exist = get_unique_name('', keys)
 
@@ -1041,7 +1042,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
 
         d2 = d.copy()
         d2.rename_index(names2)
-        self.assertEqual(d2.indices.keys(), names2)
+        self.assertEqual(list(d2.indices.keys()), names2)
 
         paras = []
         for k in range(N):
@@ -1058,7 +1059,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
             mset_list(names_new, idx, mget_list(names2, idx))
             d2 = d.copy()
             d2.rename_index(i_old, i_new)
-            self.assertEqual(d2.indices.keys(), names_new)
+            self.assertEqual(list(d2.indices.keys()), names_new)
 
         with self.assertRaises(ValueError):
             d.rename_index(names[:0], names2) # len not equal
@@ -1085,14 +1086,14 @@ class TestMIDict_3_Indices(unittest.TestCase):
             for order in [idx, names2]:
                 d2 = d.copy()
                 d2.reorder_indices(order)
-                self.assertEqual(d2.indices.keys(), names2)
+                self.assertEqual(list(d2.indices.keys()), names2)
 
         with self.assertRaises(KeyError):
             d.reorder_indices([]) # len not equal
 
         d2 = MIDict()
         d2.reorder_indices([])
-        self.assertEqual(d2.indices.keys(), [])
+        self.assertEqual(list(d2.indices.keys()), [])
 
     def test_add_index(self):
         d, items, names = self.get_data()
