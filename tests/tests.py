@@ -50,11 +50,130 @@ def get_data3(cls=MIDict):
     d = cls(items, names)
     return d, items, names
 
+# run command line:
 # !coverage run tests/tests.py;coverage report;coverage html
 
 #==============================================================================
 # test cases
 #==============================================================================
+
+class TestBasic(unittest.TestCase):
+    def test_od_replace_key(self):
+        keys0 = list(range(10))
+        od0 = OrderedDict.fromkeys(keys0)
+
+        keys = list(keys0)
+        i = 5 # single
+        i2 = 50
+        value = 'new value'
+        keys[i] = i2
+        od = od0.copy()
+        od_replace_key(od, i, i2, value)
+        self.assertEqual(od.keys(), keys)
+        self.assertEqual(od[i2], value)
+
+        keys = list(keys0)
+        i = 5 # single
+        i2 = 6 # overwrite
+        keys.remove(i2)
+        keys[i] = i2
+        od = od0.copy()
+        od_replace_key(od, i, i2)
+        self.assertEqual(od.keys(), keys)
+
+        keys = list(keys0)
+        i = [5, 6] # multi
+        i2 = [50, 60]
+        value = ['new value 1', 'new value 2']
+        mset_list(keys, i, i2)
+        od = od0.copy()
+        od_replace_key(od, i, i2, value)
+        self.assertEqual(od.keys(), keys)
+        for k,v in zip(i2, value):
+            self.assertEqual(od[k], v)
+
+        with self.assertRaises(ValueError):
+            od_replace_key(od, [1], [1,2]) # len not equal
+
+        with self.assertRaises(ValueError):
+            od_replace_key(od, [1], [10], [1, 2]) # len not equal
+
+    def test_od_reorder_keys(self):
+        keys = list(range(10))
+        od = OrderedDict.fromkeys(keys)
+        keys2 = keys[::-1]
+        od_reorder_keys(od, keys2)
+        self.assertEqual(od.keys(), keys2)
+
+        with self.assertRaises(KeyError):
+            od_reorder_keys(od, [])
+
+    def test_convert_dict(self):
+        d0 = {1:{1:1}, 2:[{2:2}]}
+#        ad = AttrDict({1:AttrDict({1:1}), 2:[AttrDict({2:2})]})
+        d = convert_dict(d0, AttrDict)
+        self.assertIsInstance(d, AttrDict)
+        self.assertIsInstance(d[1], AttrDict)
+        self.assertIsInstance(d[2][0], AttrDict)
+
+
+    def test_AttrDict(self):
+        d = AttrDict()
+        self.assertTrue(hasattr(d, '_AttrDict__attr2item'))
+
+        d.a = 1
+        d.b = 2
+        delattr(d, 'a')
+        del d['b']
+        self.assertEqual(d, AttrDict())
+        delattr(d, '_AttrDict__attr2item')
+
+
+    def test_IndexDict(self):
+        names = ['name', 'uid', 'ip']
+        N = len(names)
+        d = IndexDict(zip(names, range(N)), name='jack') # overwrite
+
+        names_not_exist = get_unique_name('', names)
+
+        self.assertEqual(d['name'], 'jack')
+
+        d[:] = [None] * N
+        self.assertEqual(d[:], [None] * N)
+
+        paras = []
+        paras.append(N+10)
+        paras.append(names_not_exist)
+        paras.append(_s[names_not_exist:])
+        paras.append(_s[:names_not_exist])
+
+        for para in paras:
+            with self.assertRaises(KeyError):
+                d[para]
+
+        with self.assertRaises(ValueError):
+            d[:] = [None] * (N + 10) # len not equal
+
+        for key in [None, 0, (1,2)]: # not allowed key types
+            with self.assertRaises(TypeError):
+                IndexDict([[key, 1]])
+
+        # not allowed key types
+        with self.assertRaises(TypeError):
+            d[None] = 1
+
+        del d['name']
+        del d[:]
+        self.assertEqual(d, IndexDict())
+
+
+    def test_ValueExistsError(self):
+        for cls in [KeyError, MIMappingError, Exception]:
+            self.assertTrue(issubclass(ValueExistsError, cls))
+        value, index_order, index_name = 'jack', 1, 'name'
+        e = ValueExistsError(value, index_order, index_name)
+        str(e) # no error
+
 
 
 class TestMIMapping(unittest.TestCase):
@@ -167,6 +286,7 @@ class TestMIMapping(unittest.TestCase):
 
 
 
+
 class TestFrozenMIDict(unittest.TestCase):
     def test_convert(self):
         for cls in [MIMapping, MIDict]:
@@ -180,61 +300,10 @@ class TestFrozenMIDict(unittest.TestCase):
         set([d, d])
 
 
-class TestBasic(unittest.TestCase):
-    def test_od_replace_key(self):
-        keys0 = list(range(10))
-        od0 = OrderedDict.fromkeys(keys0)
-
-        keys = list(keys0)
-        i = 5 # single
-        i2 = 50
-        value = 'new value'
-        keys[i] = i2
-        od = od0.copy()
-        od_replace_key(od, i, i2, value)
-        self.assertEqual(od.keys(), keys)
-        self.assertEqual(od[i2], value)
-
-        keys = list(keys0)
-        i = 5 # single
-        i2 = 6 # overwrite
-        keys.remove(i2)
-        keys[i] = i2
-        od = od0.copy()
-        od_replace_key(od, i, i2)
-        self.assertEqual(od.keys(), keys)
-
-        keys = list(keys0)
-        i = [5, 6] # multi
-        i2 = [50, 60]
-        value = ['new value 1', 'new value 2']
-        mset_list(keys, i, i2)
-        od = od0.copy()
-        od_replace_key(od, i, i2, value)
-        self.assertEqual(od.keys(), keys)
-        for k,v in zip(i2, value):
-            self.assertEqual(od[k], v)
-
-        with self.assertRaises(ValueError):
-            od_replace_key(od, [1], [1,2]) # len not equal
-
-        with self.assertRaises(ValueError):
-            od_replace_key(od, [1], [10], [1, 2]) # len not equal
-
-    def test_AttrDict(self):
-        d = AttrDict()
-        self.assertTrue(hasattr(d, '_AttrDict__attr2item'))
-
-        d.a = 1
-        d.b = 2
-        delattr(d, 'a')
-        del d['b']
-        self.assertEqual(d, AttrDict())
-        delattr(d, '_AttrDict__attr2item')
-
 #==============================================================================
 # test MIDict
 #==============================================================================
+
 
 class TestMIDict_3_Indices(unittest.TestCase):
 
@@ -556,18 +625,20 @@ class TestMIDict_3_Indices(unittest.TestCase):
                                 # d[key, name], d[key, i], d[key, tuple] or d[key, k1, k2...] not working
                                 if (len(para) == 2 and not isinstance(para[1], (list, slice))) or len(para) > 2:
                                     with self.assertRaises(KeyError):
-                                        try:
-                                            d2[para]
-                                            print 'not raise', para, value
-                                        except:
-                                            raise
+                                        d2[para]
+#                                        try:
+#                                            d2[para]
+#                                            print 'not raise', para, value
+#                                        except:
+#                                            raise
                                     continue
 
-                            try:
-                                d2[para] = value
-                            except:
-                                print 'error', para, value
-                                raise
+                            d2[para] = value
+#                            try:
+#                                d2[para] = value
+#                            except:
+#                                print 'error', para, value
+#                                raise
                             self.assertEqual(d2, d_new,
                                 '%r :not equal: %r, d[%r] = %r' % (d_new, d2, para, value))
 #        print cnt
@@ -775,13 +846,15 @@ class TestMIDict_3_Indices(unittest.TestCase):
 
     def test_repr(self):
         for cls in [MIMapping, MIDict, FrozenMIDict]:
-            d, items, names = self.get_data(cls)
-            r = repr(d)
-            d2 = eval(r)
-            self.assertEqual(d.__class__, d2.__class__)
-            self.assertEqual(d, d2)
-            self.assertIs(d2.indices[0], d2)
-
+            d0 = cls()
+            d1, items, names = self.get_data(cls)
+            for d in [d0, d1]:
+                r = repr(d)
+                d2 = eval(r)
+                self.assertEqual(d.__class__, d2.__class__)
+                self.assertEqual(d, d2)
+                if d2.indices: # not empty
+                    self.assertIs(d2.indices[0], d2)
 
     def test_reduce(self):
         for cls in [MIMapping, MIDict, FrozenMIDict]:
@@ -909,6 +982,11 @@ class TestMIDict_3_Indices(unittest.TestCase):
 
         with self.assertRaises(KeyError):
             d.viewdict(len(names) + 10)
+
+        v = d.viewdict(0, -1)
+        d.clear(True) # delete indices after view
+        with self.assertRaises(KeyError):
+            v.values() # index not found
 
         d = MIDict()
         v = d.viewdict()

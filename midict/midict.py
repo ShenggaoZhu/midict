@@ -62,7 +62,7 @@ def od_replace_key(od, key, new_key, *args, **kw):
 
 
 
-def od_reorder_keys(od, keys_in_new_order): # not used # pragma: no cover
+def od_reorder_keys(od, keys_in_new_order): # not used
     '''
     Reorder the keys in an OrderedDict ``od`` in-place.
     '''
@@ -150,7 +150,7 @@ class AttrDict(dict):
 
 
 
-def convert_dict(d, cls=AttrDict): # not used # pragma: no cover
+def convert_dict(d, cls=AttrDict): # not used
     '''
     recursively convert a normal Mapping `d` and it's values to a specified type
     (defaults to AttrDict)
@@ -273,6 +273,7 @@ def convert_index_to_keys(d, item):
         single = False
 
     else:  # other types, treated as a single key
+        IndexDict_check_key_type(item)
         single = True
 
     return item, single
@@ -938,9 +939,10 @@ class MIMapping(AttrOrdDict):
             return NotImplemented
 
         lt = super(MIMapping, self).__lt__(other)
-        if lt is True:
+        if lt is True: # pragma: no cover
             return lt
-        elif lt is False: # equal or greater
+        elif lt is False: # pragma: no cover
+            # equal or greater
             if isinstance(other, MIMapping):
                 if self.items() == other.items():
                     return self.indices.keys() < other.indices.keys()
@@ -979,7 +981,7 @@ class MIMapping(AttrOrdDict):
     def __repr__(self, _repr_running={}):
         'repr as "MIDict(items, names)"'
         call_key = id(self), _get_ident()
-        if call_key in _repr_running:
+        if call_key in _repr_running: # pragma: no cover
             return '<%s(...)>' % self.__class__.__name__
         _repr_running[call_key] = 1
         try:
@@ -987,7 +989,8 @@ class MIMapping(AttrOrdDict):
                 if self.indices:
                     names = self.indices.keys()
                     return '%s(%s, %s)' % (self.__class__.__name__, self.items(), names)
-            except AttributeError:  # may not have attr ``indices`` yet
+            except AttributeError: # pragma: no cover
+                # may not have attr ``indices`` yet
                 pass
             return '%s()' % self.__class__.__name__
         finally:
