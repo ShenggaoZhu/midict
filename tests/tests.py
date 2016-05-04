@@ -887,7 +887,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
         d = MIMapping() # empty
         self.assertEqual(list(reversed(d)), list(d.keys())[::-1])
         with self.assertRaises(KeyError):
-            d.__reversed__(0)
+            list(d.__reversed__(0))
 
     def test_keys_values_items(self):
         d, items, names = self.get_data()

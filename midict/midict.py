@@ -5,6 +5,7 @@ Created on Fri Feb 19 22:46:14 2016
 @author: shenggao
 """
 from __future__ import absolute_import, division, print_function #, unicode_literals
+
 import sys
 
 PY2 = sys.version_info[0] == 2
@@ -22,13 +23,17 @@ else:
     string_types = str, bytes
     _map = map
     map = lambda *args: list(_map(*args)) # always return a list
-    
+
 def force_list(a):
-    'force an iterable ``a`` into a list if it is not a list'
+    '''convert an iterable ``a`` into a list if it is not a list.'''
     if isinstance(a, list):
         return a
     return list(a)
 
+
+#==============================================================================
+# auxiliary functions
+#==============================================================================
 
 
 def od_replace_key(od, key, new_key, *args, **kw):
@@ -1101,44 +1106,51 @@ class MIMapping(AttrOrdDict):
     # pop, popitem, setdefault
 
     def __iter__(self, index=None):
-        'Return an iterator through keys in the ``index`` (defaults to the first index)'
+        'Iterate through keys in the ``index`` (defaults to the first index)'
 
         if self.indices:
             if index is None:
                 index = 0
             if index == 0:
                 # use super otherwise infinite loop of __iter__
-                return super(MIMapping, self).__iter__()
+                for x in super(MIMapping, self).__iter__():
+                    yield x
             else:
-                return iter(self.indices[index])
+                for x in self.indices[index]:
+                    yield x
 
         else:
             if index is None:
-                return iter(())
+                for x in ():
+                    yield x
             else:
                 raise KeyError('Index not found (dictionary is empty): %s' % (index,))
 
 
     def __reversed__(self, index=None):
-        'Return an reversed iterator through keys in the ``index`` (defaults to the first index)'
+        'Iterate in reversed order through keys in the ``index`` (defaults to the first index)'
         if self.indices:
             if index is None:
                 index = 0
             if index == 0:
                 # use super otherwise infinite loop of __iter__
-                return super(MIMapping, self).__reversed__() # from OrderedDict
+                for x in super(MIMapping, self).__reversed__(): # from OrderedDict
+                    yield x
             else: # OrderedDict reverse
-                return reversed(self.indices[index])
+                for x in reversed(self.indices[index]):
+                    yield x
         else:
             if index is None:
-                return iter(())
+                for x in ():
+                    yield x
             else:
                 raise KeyError('Index not found (dictionary is empty): %s' % (index,))
 
 
     def iterkeys(self, index=None):
-        'Return an iterator through keys in the ``index`` (defaults to the first index)'
-        return self.__iter__(index)
+        'Iterate through keys in the ``index`` (defaults to the first index)'
+        for x in self.__iter__(index):
+            yield x
 
     def keys(self, index=None):
         'Return a copy list of keys in the ``index`` (defaults to the first index)'
@@ -1146,7 +1158,7 @@ class MIMapping(AttrOrdDict):
 
     def itervalues(self, index=None):
         '''
-        Return an iterator through values in the ``index`` (defaults to all indices
+        Iterate through values in the ``index`` (defaults to all indices
         except the first index).
 
         When ``index is None``, yielded values depend on the length of indices (``N``):
@@ -1188,10 +1200,11 @@ class MIMapping(AttrOrdDict):
         return list(self.itervalues(index))
 
     def iteritems(self, indices=None):
-        'Return an iterator through items in the ``indices`` (defaults to all indices)'
+        'Iterate through items in the ``indices`` (defaults to all indices)'
         if indices is None:
             indices = force_list(self.indices.keys())
-        return self.itervalues(indices)
+        for x in self.itervalues(indices):
+            yield x
 
     def items(self, indices=None):
         'Return a copy list of items in the ``indices`` (defaults to all indices)'
@@ -1871,7 +1884,8 @@ class MIKeysView(KeysView):
             return False
 
     def __iter__(self):
-        return self._mapping.iterkeys(self.index)
+        for x in self._mapping.iterkeys(self.index):
+            yield x
 
 
 class MIValuesView(ValuesView):
@@ -1891,7 +1905,8 @@ class MIValuesView(ValuesView):
         return False
 
     def __iter__(self):
-        return self._mapping.itervalues(self.index)
+        for x in self._mapping.itervalues(self.index):
+            yield x
 
 
 class MIItemsView(ItemsView):
@@ -1911,7 +1926,8 @@ class MIItemsView(ItemsView):
         return False
 
     def __iter__(self):
-        return self._mapping.iteritems(self.index)
+        for x in self._mapping.iteritems(self.index):
+            yield x
 
 
 class MIDictView(KeysView):
@@ -1936,34 +1952,38 @@ class MIDictView(KeysView):
         else:
             return False
 
-    def __len__(self):
-        return len(self._mapping)
-
     def __iter__(self):
-        return self._mapping.iterkeys(self.index_key)
+        for x in self._mapping.iterkeys(self.index_key):
+            yield x
 
     def iterkeys(self):
-        return iter(self)
+        for x in self:
+            yield x
 
     def itervalues(self): # single index
         index = self.index_value
         if self._mapping.indices:
             if index is None:
                 index = -1
-            return self._mapping.iterkeys(index)
+            for x in self._mapping.iterkeys(index):
+                yield x
         else:
             if index is None:
-                return iter(())
+                for x in ():
+                    yield x
             else:
                 raise KeyError('Index not found (dictionary is empty): %s' % (index,))
 
     def iteritems(self):
         if self._mapping.indices:
-            return self._mapping.iteritems([
+            items = self._mapping.iteritems([
                 0 if self.index_key is None else self.index_key,
                 -1 if self.index_value is None else self.index_value])
+            for x in items:
+                yield x
         else:
-            return iter(())
+            for x in ():
+                yield x
 
     def keys(self):
         return list(self.iterkeys())
