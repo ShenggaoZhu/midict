@@ -71,21 +71,57 @@ def od_replace_key(od, key, new_key, *args, **kw):
                 od_replace_key(od, k_old, k_new)
         return
 
-    if new_key == key:
-        return
-    if new_key in od:
-        del od[new_key]
-
-    _map = od._OrderedDict__map
-    link = _map[key]
-    link[2] = new_key
-    del _map[key]
-    _map[new_key] = link
-    value = dict.pop(od, key)
+    # single key
+    
     if args:
         value = args[0]
-    dict.__setitem__(od, new_key, value)
 
+    if new_key == key:
+        if args:
+            OrderedDict.__setitem__(od, key, value)
+        return
+        
+    # new_key != key
+    if new_key in od: # new_key overwrites another existing key
+            OrderedDict.__delitem__(od, new_key)
+    
+    if PY2: 
+        # modify internal variables
+        _map = od._OrderedDict__map
+        link = _map[key]
+        link[2] = new_key
+        del _map[key]
+        _map[new_key] = link
+        value = dict.pop(od, key)
+        
+        dict.__setitem__(od, new_key, value)
+
+    else: 
+        # in PY3, OrderedDict is implemented in C
+        # no access to private variables __map
+        found = False
+        keys = [] # keys after key
+        for k in od:
+            if k == key:
+                found = True
+                continue
+            if found:
+                keys.append(k)
+        # warning: can not use OrderedDict.pop, which calls del self[key]
+        getitem = dict.__getitem__
+        setitem = OrderedDict.__setitem__
+        delitem = OrderedDict.__delitem__
+        v = getitem(od, key)
+        delitem(od, key)
+        if args:
+            v = value
+        setitem(od, new_key, v)
+        # shift keys to after new_key
+        for k in keys:
+            # od[k] = od.pop(k) # can not call this directly in MIDict
+            v = getitem(od, k)
+            delitem(od, k)
+            setitem(od, k, v)
 
 
 def od_reorder_keys(od, keys_in_new_order): # not used
@@ -364,12 +400,14 @@ class IndexDict(dict):
 
     def __init__(self, *args, **kw):
         'check key is valid'
+        super(IndexDict, self).__init__()
         if args:
+            # if args[0] is an iterator (eg zip in PY3)
+            # args[0] can only be iterated once
             for key, value in args[0]:
                 IndexDict_check_key_type(key)
-        super(IndexDict, self).__init__(*args, **kw)
-
-#
+                self[key] = value
+        self.update(**kw)
 
     def __getitem__(self, item):
         '''
@@ -657,7 +695,7 @@ def mset_list(item, index, value):
     if isinstance(index, (int, slice)):
         item[index] = value
     else:
-        return map(item.__setitem__, index, value)
+        map(item.__setitem__, index, value)
 
 
 def MI_get_item(self, key, index=0):
@@ -755,6 +793,7 @@ def _MI_setitem(self, args, value):
             indices[i][v] = key
 
     else: # not new key
+#        import pdb;pdb.set_trace()
         key1 = item[0]
         item2 = list(item)  # copy item first
         mset_list(item2, index2_list, value) # index2_list may also override index1
@@ -935,19 +974,26 @@ class MIMapping(AttrOrdDict):
         """
         if not isinstance(other, Mapping):
             return NotImplemented
+        
+        is_MIMapping = isinstance(other, MIMapping)
+        if not is_MIMapping: # assuming other is a normal 2-index mapping
+            if len(self.indices) not in [0,2]:
+                return False # indices not equal
 
         eq = super(MIMapping, self).__eq__(other)
 
         if not eq:
             return False
 
-        if isinstance(other, MIMapping):
+        if is_MIMapping:
             eq = force_list(self.indices.keys()) == force_list(other.indices.keys())
 
         return eq # ignore indices
 
-#    def __ne__(self, other): # inherited from OrderedDict
-#        return not self == other
+        
+    def __ne__(self, other): # PY2: inherited from OrderedDict
+        return not self == other
+        
 
     def __lt__(self, other):
         '''
@@ -963,17 +1009,8 @@ class MIMapping(AttrOrdDict):
         '''
         if not isinstance(other, Mapping):
             return NotImplemented
-
-        lt = super(MIMapping, self).__lt__(other)
-        if lt is True: # pragma: no cover
-            return lt
-        elif lt is False: # pragma: no cover
-            # equal or greater
-            if isinstance(other, MIMapping):
-                if self.items() == other.items():
-                    return force_list(self.indices.keys()) < force_list(other.indices.keys())
-            return False
-        elif lt is NotImplemented:
+        
+        if PY2:
             cp = super(MIMapping, self).__cmp__(other) # Python2
             if cp < 0:
                 return True
@@ -981,6 +1018,9 @@ class MIMapping(AttrOrdDict):
                 if isinstance(other, MIMapping):
                     return force_list(self.indices.keys()) < force_list(other.indices.keys())
             return False
+        else: # PY3
+            raise TypeError('unorderable types %r < %r' % (self, other))
+            
 
     # use __lt__
 
@@ -1857,8 +1897,8 @@ class FrozenMIDict(MIMapping, Hashable):
     def __hash__(self):
         """Return the hash of this bidict."""
         if self._hash is None:
-            self._hash = hash((frozenset(self.viewitems()), frozenset(
-                self.indices.viewkeys())))
+            self._hash = hash((frozenset(self.items()), frozenset(
+                self.indices.keys())))
         return self._hash
 
 ############################################

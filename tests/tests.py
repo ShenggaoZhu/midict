@@ -42,7 +42,6 @@ class EasyArg(object):
 _s = EasyArg()
 
 
-
 def get_data3(cls=MIDict):
     items = [['jack', 1, (192,1)],
              ['tony', 2, (192,2)],
@@ -629,7 +628,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
                                         d2[para]
 #                                        try:
 #                                            d2[para]
-#                                            print 'not raise', para, value
+#                                            print('not raise', para, value)
 #                                        except:
 #                                            raise
                                     continue
@@ -638,7 +637,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
 #                            try:
 #                                d2[para] = value
 #                            except:
-#                                print 'error', para, value
+#                                print('error', para, value)
 #                                raise
                             self.assertEqual(d2, d_new,
                                 '%r :not equal: %r, d[%r] = %r' % (d_new, d2, para, value))
@@ -834,15 +833,21 @@ class TestMIDict_3_Indices(unittest.TestCase):
 
         self.assertEqual(d, d2)
 
-        for x in [1, dn, ds, dct]:
+        for x in [dn, ds, dct]:
             self.assertNotEqual(d, x)
-        for x in [1, dn, ds]:
-            self.assertGreater(d, x)
-            self.assertGreaterEqual(d, x)
-            self.assertLess(x, d)
-            self.assertLessEqual(x, d)
-        self.assertLess(d, dct)
-        self.assertGreater(dct, d)
+            
+        for x in [dn, ds]:
+            if PY2:
+                self.assertGreater(d, x)
+                self.assertGreaterEqual(d, x)
+                self.assertLess(x, d)
+                self.assertLessEqual(x, d)
+            else:
+                with self.assertRaises(TypeError):
+                    d < x
+        if PY2:
+            self.assertLess(d, dct)
+            self.assertGreater(dct, d)
 
 
     def test_repr(self):
@@ -1186,16 +1191,19 @@ class TestMIDict_2_Indices(TestMIDict_3_Indices):
             for f in funcs:
                 self.assertEqual(call(d, f), call(d2, f))
 
-        funcs_ordered = ['keys', 'values', 'items']
-        for f in funcs_ordered:
-            self.assertItemsEqual(call(d, f), call(dct, f))
-            self.assertEqual(call(d, f), call(od, f))
+        if PY2:
+            funcs_ordered = ['keys', 'values', 'items']
+            for f in funcs_ordered:
+                self.assertEqual(set(call(d, f)), set(call(dct, f)))
+                self.assertEqual(call(d, f), call(od, f))
 
         funcs_ordered_views = ['viewkeys', 'viewvalues', 'viewitems']
+        if PY3:
+            funcs_ordered_views = ['keys', 'values', 'items']
         test_data = [[key_exist, key_not_exist], [value_exist, value_not_exist],
                      [item_exist, item_not_exist]]
         for f, data in zip(funcs_ordered_views, test_data):
-            self.assertItemsEqual(list(call(d, f)), list(call(dct, f)))
+            self.assertEqual(set(call(d, f)), set(call(dct, f)))
             self.assertEqual(list(call(d, f)), list(call(od, f)))
             for x in data:
                 self.assertEqual(x in call(d, f), x in call(dct, f))
@@ -1203,7 +1211,9 @@ class TestMIDict_2_Indices(TestMIDict_3_Indices):
 
 
 
-        funcs_key = ['__contains__', 'has_key', 'get']
+        funcs_key = ['__contains__', 'get']
+        if PY2:
+            funcs_key.append('has_key')
         for d2 in [dct, od]:
             for f in funcs_key:
                 for key in [key_exist, key_not_exist]:
