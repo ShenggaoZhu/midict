@@ -30,6 +30,18 @@ def force_list(a):
         return a
     return list(a)
 
+def cvt_iter(a):
+    '''
+    Convert an iterator/generator to a tuple so that it can be iterated again.
+    
+    E.g., convert zip in PY3.
+    '''
+    if a is None:
+        return a
+    if not isinstance(a, (tuple, list)):
+        # convert iterator/generator to tuple
+        a = tuple(a)
+    return a
 
 #==============================================================================
 # auxiliary functions
@@ -830,9 +842,12 @@ def _MI_init(self, *args, **kw):
                     items = force_list(items.items())
                 except TypeError:  # items() may be not callalbe
                     pass
+            else:
+                items = cvt_iter(items)
 
     if n_args >= 2:
         names = args[1] # may be None
+        names = cvt_iter(names)
 
     if n_args >= 3:
         raise TypeError('At most 2 positional arguments allowed (%s given)' % n_args)

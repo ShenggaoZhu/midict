@@ -191,9 +191,17 @@ class TestMIMapping(unittest.TestCase):
 
         for items, names in data:
             for n in [names, ''.join(names)]: # single str '012'
-                d = MIDict(items, names)
-                self.assertEqual(list(d.indices.keys()), names)
-                self.assertEqual(d.items(), items)
+                d1 = MIDict(items, names)
+                d2 = MIDict(iter(items), iter(names))
+                d3 = MIDict(d1.viewitems(), iter(names))
+                ds = [d1, d2, d3]
+                if PY3: # zip is iter
+                    cols = list(zip(*items))
+                    d4 = MIDict(zip(*cols), names) 
+                    ds.append(d4)
+                for d in ds:
+                    self.assertEqual(list(d.indices.keys()), names)
+                    self.assertEqual(d.items(), items)
 
         d = MIDict(items, names)
         d2 = MIDict(d)
