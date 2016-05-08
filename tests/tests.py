@@ -193,15 +193,19 @@ class TestMIMapping(unittest.TestCase):
             for n in [names, ''.join(names)]: # single str '012'
                 d1 = MIDict(items, names)
                 d2 = MIDict(iter(items), iter(names))
-                d3 = MIDict(d1.viewitems(), iter(names))
-                ds = [d1, d2, d3]
+                
+                ds = [d1, d2]
                 if PY3: # zip is iter
                     cols = list(zip(*items))
                     d4 = MIDict(zip(*cols), names) 
-                    ds.append(d4)
+                    ds += [d4]
+                else:
+                    d3 = MIDict(d1.viewitems(), iter(names))
+                    ds += [d3]
+
                 for d in ds:
                     self.assertEqual(list(d.indices.keys()), names)
-                    self.assertEqual(d.items(), items)
+                    self.assertEqual(force_list(d.items()), items)
 
         d = MIDict(items, names)
         d2 = MIDict(d)
@@ -728,7 +732,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
                 paras.append([(arg_exist, [index2, index2_exist], index2), [0,1], KeyError])
 
          # value exists
-        paras.append([(arg_exist,-1), d.keys(-1)[-1], ValueExistsError]) # duplicate last index last value
+        paras.append([(arg_exist,-1), force_list(d.keys(-1))[-1], ValueExistsError]) # duplicate last index last value
         paras.append([arg_exist, value2, ValueExistsError])
         paras.append([_s[arg_exist, :], item2, ValueExistsError])
         paras.append([_s[index_exist: key_not_exist, :], item, ValueExistsError])
@@ -841,23 +845,22 @@ class TestMIDict_3_Indices(unittest.TestCase):
 
         self.assertEqual(d, d2)
 
-        for x in [dn, ds, dct]:
+        for x in [1, dn, ds, dct]:
             self.assertNotEqual(d, x)
-            
-        for x in [dn, ds]:
-            if PY2:
+        if PY2: 
+            self.assertLess(d, dct)
+            self.assertGreater(dct, d)
+            for x in [1, dn, ds]:
                 self.assertGreater(d, x)
                 self.assertGreaterEqual(d, x)
                 self.assertLess(x, d)
                 self.assertLessEqual(x, d)
-            else:
-                with self.assertRaises(TypeError):
-                    d < x
-        if PY2:
-            self.assertLess(d, dct)
-            self.assertGreater(dct, d)
-
-
+        else:
+            for x in [dn, ds]:
+                for m in ['__lt__',  '__gt__', '__le__','__ge__']:
+                    with self.assertRaises(TypeError):
+                        call(d, m, x)
+                        
     def test_repr(self):
         for cls in [MIMapping, MIDict, FrozenMIDict]:
             d0 = cls()
@@ -893,7 +896,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
         self.assertEqual(list(reversed(d)), list(d.keys())[::-1])
 
         for index in names:
-            keys = d.keys(index)
+            keys = force_list(d.keys(index))
             rev = list(d.__reversed__(index))
             self.assertEqual(rev, keys[::-1])
 
@@ -929,24 +932,36 @@ class TestMIDict_3_Indices(unittest.TestCase):
                      [item_exist, item_not_exist]]
         # check gt
         for f, fv, gt, test in zip(funcs, funcs_views, gt_data, test_data):
-            self.assertEqual(call(d, f), gt)
-            self.assertEqual(list(call(d, fv)), gt)
+            if PY2:
+                self.assertEqual(call(d, f), gt)
+                self.assertEqual(list(call(d, fv)), gt)
+            else:
+                self.assertEqual(list(call(d, f)), gt)
 
             v_exist, v_not_exist = test
-            for fn in [f, fv]:
-                self.assertIn(v_exist, call(d, fn))
-                self.assertNotIn(v_not_exist, call(d, fn))
+            if PY2:
+                for fn in [f, fv]:
+                    self.assertIn(v_exist, call(d, fn))
+                    self.assertNotIn(v_not_exist, call(d, fn))
+            else:
+                self.assertIn(v_exist, call(d, f))
+                self.assertNotIn(v_not_exist, call(d, f))
 
         # use index
+        if PY2:
+            funcs_all = funcs + funcs_views
+        else:
+            funcs_all = funcs
+        
         for k in range(N):
             gt = [it[k] for it in items]
             for i in [k, names[k]]:
-                for f in funcs + funcs_views:
+                for f in funcs_all:
                     self.assertEqual(list(call(d, f, i)), gt)
 
         index_not_exist = get_unique_name('', names)
         for i in [index_not_exist, N + 10, -N - 10]:
-            for f in funcs + funcs_views:
+            for f in funcs_all:
                 with self.assertRaises(KeyError):
                     list(call(d, f, i))
 
@@ -954,14 +969,21 @@ class TestMIDict_3_Indices(unittest.TestCase):
         d = MIDict()
         gt_data = [[], [], []]
         for f, fv, gt in zip(funcs, funcs_views, gt_data):
-            self.assertEqual(call(d, f), gt)
-            self.assertEqual(list(call(d, fv)), gt)
+            if PY2:
+                self.assertEqual(call(d, f), gt)
+                self.assertEqual(list(call(d, fv)), gt)
+            else:
+                self.assertEqual(list(call(d, f)), gt)
+                
             v_not_exist = None
-            for fn in [f, fv]:
-                self.assertNotIn(v_not_exist, call(d, fn))
-
+            if PY2:
+                for fn in [f, fv]:
+                    self.assertNotIn(v_not_exist, call(d, fn))
+            else:
+                self.assertNotIn(v_not_exist, call(d, f))
+                
         for i in [index_not_exist, N + 10, -N - 10]:
-            for f in funcs + funcs_views:
+            for f in funcs_all:
                 with self.assertRaises(KeyError):
                     list(call(d, f, i))
 
@@ -1187,11 +1209,11 @@ class TestMIDict_2_Indices(TestMIDict_3_Indices):
         dct = dict(items)
         od = OrderedDict(items)
 
-        key_exist = d.keys()[0]
+        key_exist = force_list(d.keys())[0]
         key_not_exist = get_unique_name('', d)
-        value_exist = d.values()[0]
+        value_exist = force_list(d.values())[0]
         value_not_exist = get_unique_name('', d.values())
-        item_exist = d.items()[0]
+        item_exist = force_list(d.items())[0]
         item_not_exist = (key_not_exist, value_not_exist)
 
         funcs = ['__len__', ]

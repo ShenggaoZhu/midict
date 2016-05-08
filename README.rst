@@ -6,7 +6,7 @@ MIDict is an ordered "dictionary" with multiple indices
 where any index can serve as "keys" or "values",
 capable of assessing multiple values via its powerful indexing syntax,
 and suitable as a bidirectional/inverse dict (a drop-in replacement
-for dict/OrderedDict).
+for dict/OrderedDict in Python 2 & 3).
 
 **Features**:
 
@@ -14,7 +14,7 @@ for dict/OrderedDict).
 * Multi-value indexing syntax
 * Convenient indexing shortcuts
 * Bidirectional/inverse dict
-* Compatible with normal dict
+* Compatible with normal dict in Python 2 & 3
 * Accessing keys via attributes
 * Extended methods for multi-indices
 * Additional APIs to handle indices
@@ -141,8 +141,8 @@ can be used as a normal dict, as well as a convenient
       <==> mi_dict[-1:1, 0]
 
 
-Compatible with normal dict
----------------------------
+Compatible with normal dict in Python 2 & 3
+-------------------------------------------
 
 A MIDict with 2 indices is fully compatible with the normal dict
 or OrderedDict, and can be used as a drop-in replacement of the latter::
@@ -387,6 +387,7 @@ More examples of advanced indexing
                       [2, 'tony', '192.2'],
                       [3, 'tom', '192.3']],
                      ['uid', 'name', 'ip'])
+
 
 
 

@@ -12,6 +12,7 @@ PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
 
 from collections import Hashable, ItemsView, KeysView, Mapping, OrderedDict, ValuesView
+from abc import ABCMeta
 
 NoneType = type(None)
 
@@ -24,6 +25,19 @@ else:
     _map = map
     map = lambda *args: list(_map(*args)) # always return a list
 
+# from six library
+def with_metaclass(meta, *bases):
+    """Create a base class with a metaclass."""
+    # This requires a bit of explanation: the basic idea is to make a dummy
+    # metaclass for one level of class instantiation that replaces itself with
+    # the actual metaclass.
+    class metaclass(meta):
+
+        def __new__(cls, name, this_bases, d):
+            return meta(name, bases, d)
+    return type.__new__(metaclass, 'temporary_class', (), {})
+
+
 def force_list(a):
     '''convert an iterable ``a`` into a list if it is not a list.'''
     if isinstance(a, list):
@@ -33,7 +47,7 @@ def force_list(a):
 def cvt_iter(a):
     '''
     Convert an iterator/generator to a tuple so that it can be iterated again.
-    
+
     E.g., convert zip in PY3.
     '''
     if a is None:
@@ -84,7 +98,7 @@ def od_replace_key(od, key, new_key, *args, **kw):
         return
 
     # single key
-    
+
     if args:
         value = args[0]
 
@@ -92,23 +106,24 @@ def od_replace_key(od, key, new_key, *args, **kw):
         if args:
             OrderedDict.__setitem__(od, key, value)
         return
-        
+
     # new_key != key
     if new_key in od: # new_key overwrites another existing key
-            OrderedDict.__delitem__(od, new_key)
-    
-    if PY2: 
+        OrderedDict.__delitem__(od, new_key)
+
+    if PY2:
         # modify internal variables
         _map = od._OrderedDict__map
         link = _map[key]
         link[2] = new_key
         del _map[key]
         _map[new_key] = link
-        value = dict.pop(od, key)
-        
-        dict.__setitem__(od, new_key, value)
+        val = dict.pop(od, key)
+        if args:
+            val = value
+        dict.__setitem__(od, new_key, val)
 
-    else: 
+    else:
         # in PY3, OrderedDict is implemented in C
         # no access to private variables __map
         found = False
@@ -900,6 +915,19 @@ def _MI_init(self, *args, **kw):
             _MI_setitem(self, primary_key, value)
 
 
+
+def MI_method_PY3(cls):
+    '''class decorator to change MIMapping method names for PY3 compatibility'''
+
+    nmspc = cls.__dict__.copy()
+    for m in ['__cmp__', 'has_key']:
+        nmspc.pop(m)
+    methods = ['keys', 'values', 'items']
+    for m in methods:
+        nmspc[m] = nmspc.pop('view' + m)
+    return type(cls)(cls.__name__, cls.__bases__, nmspc)
+
+
 class MIMapping(AttrOrdDict):
     '''
     Base class for all provided multi-index dictionary (MIDict) types.
@@ -989,7 +1017,7 @@ class MIMapping(AttrOrdDict):
         """
         if not isinstance(other, Mapping):
             return NotImplemented
-        
+
         is_MIMapping = isinstance(other, MIMapping)
         if not is_MIMapping: # assuming other is a normal 2-index mapping
             if len(self.indices) not in [0,2]:
@@ -1005,10 +1033,10 @@ class MIMapping(AttrOrdDict):
 
         return eq # ignore indices
 
-        
+
     def __ne__(self, other): # PY2: inherited from OrderedDict
         return not self == other
-        
+
 
     def __lt__(self, other):
         '''
@@ -1024,7 +1052,7 @@ class MIMapping(AttrOrdDict):
         '''
         if not isinstance(other, Mapping):
             return NotImplemented
-        
+
         if PY2:
             cp = super(MIMapping, self).__cmp__(other) # Python2
             if cp < 0:
@@ -1035,7 +1063,7 @@ class MIMapping(AttrOrdDict):
             return False
         else: # PY3
             raise TypeError('unorderable types %r < %r' % (self, other))
-            
+
 
     # use __lt__
 
@@ -1069,7 +1097,8 @@ class MIMapping(AttrOrdDict):
             try:
                 if self.indices:
                     names = force_list(self.indices.keys())
-                    return '%s(%s, %s)' % (self.__class__.__name__, self.items(), names)
+                    items = force_list(self.items())
+                    return '%s(%s, %s)' % (self.__class__.__name__, items, names)
             except AttributeError: # pragma: no cover
                 # may not have attr ``indices`` yet
                 pass
@@ -1300,6 +1329,11 @@ class MIMapping(AttrOrdDict):
         else:  # empty
             return dict_type()
 
+
+if PY3: # change method names
+    MIMapping = MI_method_PY3(MIMapping)
+
+
 ############################################
 
 
@@ -1309,7 +1343,7 @@ class MIDict(MIMapping):
     where any index can serve as "keys" or "values",
     capable of assessing multiple values via its powerful indexing syntax,
     and suitable as a bidirectional/inverse dict (a drop-in replacement
-    for dict/OrderedDict).
+    for dict/OrderedDict in Python 2 & 3).
 
     **Features**:
 
@@ -1317,7 +1351,7 @@ class MIDict(MIMapping):
     * Multi-value indexing syntax
     * Convenient indexing shortcuts
     * Bidirectional/inverse dict
-    * Compatible with normal dict
+    * Compatible with normal dict in Python 2 & 3
     * Accessing keys via attributes
     * Extended methods for multi-indices
     * Additional APIs to handle indices
@@ -1444,8 +1478,8 @@ class MIDict(MIMapping):
           <==> mi_dict[-1:1, 0]
 
 
-    Compatible with normal dict
-    ---------------------------
+    Compatible with normal dict in Python 2 & 3
+    -------------------------------------------
 
     A MIDict with 2 indices is fully compatible with the normal dict
     or OrderedDict, and can be used as a drop-in replacement of the latter::
