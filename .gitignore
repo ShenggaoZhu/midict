@@ -65,3 +65,4 @@ target/
 #Ipython Notebook
 .ipynb_checkpoints
 >>>>>>> 1b9916b2fa608c882cc5a44d2743f7664b942f8c
+doc/_*
