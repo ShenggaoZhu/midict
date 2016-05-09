@@ -13,7 +13,7 @@ import pickle
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from midict.midict import *
+from midict import *
 
 
 def call(obj, func_name, *args, **kw):
