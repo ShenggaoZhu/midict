@@ -38,7 +38,16 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.coverage',
     'sphinx.ext.viewcode',
+    # 'sphinx.ext.napoleon',
+    'sphinx.ext.autosummary',
 ]
+
+autodoc_member_order = 'bysource'
+
+autosummary_generate = True
+
+napoleon_include_private_with_doc = True
+napoleon_include_special_with_doc = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -118,7 +127,8 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 # http://www.sphinx-doc.org/en/stable/theming.html
-html_theme = 'sphinx_rtd_theme'
+# html_theme = 'sphinx_rtd_theme'
+html_theme = 'classic'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

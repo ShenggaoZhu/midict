@@ -1,22 +1,14 @@
 midict package
 ==============
 
-Submodules
-----------
+.. module:: midict
 
-midict.midict module
---------------------
+.. autosummary::
+   :template: class.rst
+   :toctree:
 
-.. automodule:: midict.midict
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-Module contents
----------------
-
-.. automodule:: midict
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   AttrDict
+   IndexDict
+   MIMapping
+   MIDict
+   FrozenMIDict

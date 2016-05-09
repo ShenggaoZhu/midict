@@ -9,9 +9,10 @@ Welcome to MIDict's documentation!
 Contents:
 
 .. toctree::
-   :maxdepth: 2
-   
+   :maxdepth: 3
+
    README
+   midict
 
 
 
