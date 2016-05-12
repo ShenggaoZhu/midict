@@ -1,6 +1,6 @@
-=========================
-MIDict (Multi-Index Dict)
-=========================
+==================================
+MIDict (Multi-Index Dict) Tutorial
+==================================
 
 MIDict is an ordered "dictionary" with multiple indices
 where any index can serve as "keys" or "values",
