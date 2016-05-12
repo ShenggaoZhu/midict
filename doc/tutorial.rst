@@ -56,14 +56,14 @@ contain the corresponding key's value or list of values::
 
 To use any index (column) as the "keys", and other one or more
 indices as the "values", just specify the indices via the advanced
-"multi-indexing" syntax ``d[index1:key, index2]``, e.g.::
+"multi-indexing" syntax ``d[index_key:key, index_value]``, e.g.::
 
     user['name':'jack', 'uid'] -> 1
     user['ip':'192.1', 'name'] -> 'jack'
 
-Here, ``index1`` is the single column used as the "keys", and ``key`` is
-an element in ``index1`` to locate the row of record (e.g.,
-``['jack', 1, '192.1']``) in the table. ``index2`` can be one or more columns
+Here, ``index_key`` is the single column used as the "keys", and ``key`` is
+an element in ``index_key`` to locate the row of record (e.g.,
+``['jack', 1, '192.1']``) in the table. ``index_value`` can be one or more columns
 to specify the value(s) from the row of record.
 
 
@@ -73,12 +73,11 @@ Multi-value indexing syntax
 For a multi-column data set, it's useful to be able to access multiple
 values/columns at the same time.
 
-In the indexing syntax ``d[index1:key, index2]``, both ``index1`` and
-``index2`` support flexible indexing using a normal key or an ``int``,
-and ``index2`` can also be a ``tuple``, ``list`` or ``slice`` object
-to specify multiple values/columns, with the following meanings
-(the elements in the tuple/list or ``key_start``/``key_stop`` in the slice
-can be either a key or index of a key):
+In the indexing syntax ``d[index_key:key, index_value]``, both ``index_key``
+and ``index_value`` can be a normal index name
+or an ``int`` (the order the index), and ``index_value`` can also be a
+``tuple``, ``list`` or ``slice`` object to specify multiple values/columns,
+with the following meanings:
 
 ========== ========================================= ====================
     type                    meaning                  corresponding values
@@ -89,6 +88,9 @@ tuple/list multiple keys or indices of keys          list of values
 ---------- ----------------------------------------- --------------------
 slice      a range of keys (key_start:key_stop:step) list of values
 ========== ========================================= ====================
+
+The elements in the tuple/list or ``key_start``/``key_stop`` in the slice
+syntax can be a normal index name or an ``int``.
 
 See ``IndexDict`` for more details.
 
@@ -103,14 +105,14 @@ Using the above ``user`` example::
 Convenient indexing shortcuts
 -----------------------------
 
-Full syntax: ``d[index1:key, index2]``
+Full syntax: ``d[index_key:key, index_value]``
 
 Short syntax::
 
     d[key] <==> d[first_index:key, all_indice_except_first_index]
     d[:key] <==> d[None:key] <==> d[last_index:key, all_indice_except_last_index]
-    d[key, index2] <==> d[first_index:key, index2] # only when ``index2`` is a list or slice object
-    d[index1:key, index2_1, index2_2, ...] <==> d[index1:key, (index2_1, index2_2, ...)]
+    d[key, index_value] <==> d[first_index:key, index_value] # only when ``index_value`` is a list or slice object
+    d[index_key:key, index_value_1, index_value_2, ...] <==> d[index_key:key, (index_value_1, index_value_2, ...)]
 
 Examples::
 
@@ -171,7 +173,7 @@ Accessing keys via attributes
 -----------------------------
 
 Use the attribute syntax to access a key in MIDict if it is a valid
-Python identifier (``d.key`` <==> d['key'])::
+Python identifier (``d.key <==> d['key']``)::
 
     mi_dict.jack <==> mi_dict['jack']
 
@@ -242,15 +244,15 @@ Duplicate keys/values handling
 
 The elements in each index of MIDict should be unique.
 
-When setting an item using syntax ``d[index1:key, index2] = value2``,
-if ``key`` already exists in ``index1``, the item of ``key`` will be updated
-according to ``index2`` and ``value2`` (similar to updating the value of a key in
+When setting an item using syntax ``d[index_key:key, index_value] = value2``,
+if ``key`` already exists in ``index_key``, the item of ``key`` will be updated
+according to ``index_value`` and ``value2`` (similar to updating the value of a key in
 a normal ``dict``). However, if any value of ``value2``
-already exists in ``index2``, a ``ValueExistsError`` will be raised.
+already exists in ``index_value``, a ``ValueExistsError`` will be raised.
 
 When constructing a MIDict or updating it with ``d.update()``,
 duplicate keys/values are handled in the same way as above with
-the first index treated as ``index1`` and the rest indices treated as ``index2``::
+the first index treated as ``index_key`` and the rest indices treated as ``index_value``::
 
     d = MIDict(jack=1, tony=2)
 
