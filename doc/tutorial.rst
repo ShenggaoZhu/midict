@@ -1,6 +1,6 @@
-==================================
-MIDict (Multi-Index Dict) Tutorial
-==================================
+===============
+MIDict Tutorial
+===============
 
 MIDict is an ordered "dictionary" with multiple indices
 where any index can serve as "keys" or "values",
@@ -40,16 +40,14 @@ which allows any index (column) to be used as the "keys" to index the table.
 Such a "super dict" is called a multi-index dictionary (MIDict).
 
 A multi-index dictionary ``user`` can be constructed with two arguments:
-a list of items (rows of data), and a list of index names:
-
-.. code-block:: python
+a list of items (rows of data), and a list of index names::
 
     user = MIDict([['jack', 1, '192.1'],
                    ['tony', 2, '192.2']],
                   ['name', 'uid', 'ip'])
 
 Index names are for easy human understanding and indexing, and thus
-must be a ``str`` (or ``unicode``) type. The index names and items are ordered
+must be a string. The index names and items are ordered
 in the dictionary. Compatible with a normal ``dict``, the first index (column)
 is the primary index to lookup/index a key, while the rest index or indices
 contain the corresponding key's value or list of values::
@@ -58,7 +56,7 @@ contain the corresponding key's value or list of values::
 
 To use any index (column) as the "keys", and other one or more
 indices as the "values", just specify the indices via the advanced
-indexing syntax ``d[index1:key, index2]``, e.g.::
+"multi-indexing" syntax ``d[index1:key, index2]``, e.g.::
 
     user['name':'jack', 'uid'] -> 1
     user['ip':'192.1', 'name'] -> 'jack'
@@ -96,8 +94,8 @@ See ``IndexDict`` for more details.
 
 Using the above ``user`` example::
 
-    user['name':'jack', ['uid','ip']] -> [1, '192.1']
-    <==> user['name':'jack', [1,2]]
+    user['name':'jack', ['uid', 'ip']] -> [1, '192.1']
+    <==> user['name':'jack', [1, 2]]
     <==> user['name':'jack', 'uid':]
     <==> user[0:'jack', 1:]
 
@@ -119,12 +117,14 @@ Examples::
     user['jack'] -> [1, '192.1']
     user[:'192.1'] -> ['jack', 1]
     user['jack', :] -> ['jack', 1, '192.1']
+    user['jack', ['uid', 'ip']] -> [1, '192.1']
+    user[0:'jack', 'uid', 'ip'] -> [1, '192.1']
 
 
 Bidirectional/inverse dict
 --------------------------
 
-With the advanced indexing syntax, a MIDict with 2 indices
+With the advanced "multi-indexing" syntax, a MIDict with 2 indices
 can be used as a normal dict, as well as a convenient
 **bidirectional dict** to index using either a key or a value::
 
@@ -144,7 +144,7 @@ can be used as a normal dict, as well as a convenient
 Compatible with normal dict in Python 2 & 3
 -------------------------------------------
 
-A MIDict with 2 indices is fully compatible with the normal dict
+A ``MIDict`` with 2 indices is fully compatible with the normal dict
 or OrderedDict, and can be used as a drop-in replacement of the latter::
 
     normal_dict = dict(jack=1, tony=2)
@@ -163,6 +163,9 @@ Conversion between ``MIDict`` and ``dict`` is supported in both directions::
     normal_dict == dict(mi_dict) # True
     normal_dict == mi_dict.todict() # True
 
+The ``MIDict`` API also matches the ``dict`` API in Python 2 & 3. For example,
+in Python 2, ``MIDict`` has methods ``keys()``, ``values()`` and ``items()``
+that return lists. In Python 3, those methods return dictionary views, just like ``dict``.
 
 Accessing keys via attributes
 -----------------------------
