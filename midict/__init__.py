@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Feb 19 22:46:14 2016
 
-@author: shenggao
-"""
 from __future__ import absolute_import, division, print_function #, unicode_literals
 
 import sys
@@ -12,7 +8,6 @@ PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
 
 from collections import Hashable, ItemsView, KeysView, Mapping, OrderedDict, ValuesView
-from abc import ABCMeta
 
 NoneType = type(None)
 
@@ -25,18 +20,10 @@ else:
     _map = map
     map = lambda *args: list(_map(*args)) # always return a list
 
-# from six library
-def with_metaclass(meta, *bases):
-    """Create a base class with a metaclass."""
-    # This requires a bit of explanation: the basic idea is to make a dummy
-    # metaclass for one level of class instantiation that replaces itself with
-    # the actual metaclass.
-    class metaclass(meta):
 
-        def __new__(cls, name, this_bases, d):
-            return meta(name, bases, d)
-    return type.__new__(metaclass, 'temporary_class', (), {})
-
+#==============================================================================
+# auxiliary functions
+#==============================================================================
 
 def force_list(a):
     '''convert an iterable ``a`` into a list if it is not a list.'''
@@ -52,114 +39,11 @@ def cvt_iter(a):
     '''
     if a is None:
         return a
+
     if not isinstance(a, (tuple, list)):
         # convert iterator/generator to tuple
         a = tuple(a)
     return a
-
-#==============================================================================
-# auxiliary functions
-#==============================================================================
-
-
-def od_replace_key(od, key, new_key, *args, **kw):
-    '''
-    Replace key(s) in OrderedDict ``od`` by new key(s) in-place (i.e.,
-    preserving the order(s) of the key(s))
-
-    Optional new value(s) for new key(s) can be provided as a positional
-    argument (otherwise the old value(s) will be used):
-
-        od_replace_key(od, key, new_key, new_value)
-
-    To replace multiple keys, pass argument ``key`` as a list instance,
-    or explicitly pass a keyword argument ``multi=True``:
-
-        od_replace_key(od, keys, new_keys, [new_values,] multi=True)
-
-    '''
-    multi = kw.get('multi', False) or isinstance(key, list)
-
-    if multi:
-        if len(key) != len(new_key):
-            raise ValueError('Length of keys (%s) does not match '
-                             'length of new keys (%s)' % (len(key), len(new_key)))
-        if args:
-            new_value = args[0]
-            if len(new_key) != len(new_value):
-                raise ValueError('Length of new keys (%s) does not match '
-                                 'length of new values (%s)' %
-                                 (len(new_key), len(new_value)))
-            for k_old, k_new, v_new in zip(key, new_key, new_value):
-                od_replace_key(od, k_old, k_new, v_new)
-        else:
-            for k_old, k_new in zip(key, new_key):
-                od_replace_key(od, k_old, k_new)
-        return
-
-    # single key
-
-    if args:
-        value = args[0]
-
-    if new_key == key:
-        if args:
-            OrderedDict.__setitem__(od, key, value)
-        return
-
-    # new_key != key
-    if new_key in od: # new_key overwrites another existing key
-        OrderedDict.__delitem__(od, new_key)
-
-    if PY2:
-        # modify internal variables
-        _map = od._OrderedDict__map
-        link = _map[key]
-        link[2] = new_key
-        del _map[key]
-        _map[new_key] = link
-        val = dict.pop(od, key)
-        if args:
-            val = value
-        dict.__setitem__(od, new_key, val)
-
-    else:
-        # in PY3, OrderedDict is implemented in C
-        # no access to private variables __map
-        found = False
-        keys = [] # keys after key
-        for k in od:
-            if k == key:
-                found = True
-                continue
-            if found:
-                keys.append(k)
-        # warning: can not use OrderedDict.pop, which calls del self[key]
-        getitem = dict.__getitem__
-        setitem = OrderedDict.__setitem__
-        delitem = OrderedDict.__delitem__
-        v = getitem(od, key)
-        delitem(od, key)
-        if args:
-            v = value
-        setitem(od, new_key, v)
-        # shift keys to after new_key
-        for k in keys:
-            # od[k] = od.pop(k) # can not call this directly in MIDict
-            v = getitem(od, k)
-            delitem(od, k)
-            setitem(od, k, v)
-
-
-def od_reorder_keys(od, keys_in_new_order): # not used
-    '''
-    Reorder the keys in an OrderedDict ``od`` in-place.
-    '''
-    if set(od.keys()) != set(keys_in_new_order):
-        raise KeyError('Keys in the new order do not match existing keys')
-    for key in keys_in_new_order:
-        od[key] = od.pop(key)
-    return od
 
 
 #==============================================================================
@@ -490,11 +374,15 @@ class IndexDict(dict):
 
 
 class AttrOrdDict(AttrDict, OrderedDict):
-    pass
+    '''
+    AttrDict + OrderedDict
+    '''
 
 
 class IdxOrdDict(IndexDict, AttrDict, OrderedDict):
-    pass
+    '''
+    IndexDict + AttrDict + OrderedDict
+    '''
 
 
 #==============================================================================
@@ -522,6 +410,7 @@ class ValueExistsError(KeyError, MIMappingError):
 
 
 #==============================================================================
+
 
 def MI_check_index_name(name):
     'Check if index name is a valid str or unicode'
@@ -741,6 +630,107 @@ def MI_get_item(self, key, index=0):
     if N == 2:
         value = [value]
     return [key] + value
+
+
+
+def od_replace_key(od, key, new_key, *args, **kw):
+    '''
+    Replace key(s) in OrderedDict ``od`` by new key(s) in-place (i.e.,
+    preserving the order(s) of the key(s))
+
+    Optional new value(s) for new key(s) can be provided as a positional
+    argument (otherwise the old value(s) will be used):
+
+        od_replace_key(od, key, new_key, new_value)
+
+    To replace multiple keys, pass argument ``key`` as a list instance,
+    or explicitly pass a keyword argument ``multi=True``:
+
+        od_replace_key(od, keys, new_keys, [new_values,] multi=True)
+
+    '''
+    multi = kw.get('multi', False) or isinstance(key, list)
+
+    if multi:
+        if len(key) != len(new_key):
+            raise ValueError('Length of keys (%s) does not match '
+                             'length of new keys (%s)' % (len(key), len(new_key)))
+        if args:
+            new_value = args[0]
+            if len(new_key) != len(new_value):
+                raise ValueError('Length of new keys (%s) does not match '
+                                 'length of new values (%s)' %
+                                 (len(new_key), len(new_value)))
+            for k_old, k_new, v_new in zip(key, new_key, new_value):
+                od_replace_key(od, k_old, k_new, v_new)
+        else:
+            for k_old, k_new in zip(key, new_key):
+                od_replace_key(od, k_old, k_new)
+        return
+
+    # single key
+
+    if args:
+        value = args[0]
+
+    if new_key == key:
+        if args:
+            OrderedDict.__setitem__(od, key, value)
+        return
+
+    # new_key != key
+    if new_key in od: # new_key overwrites another existing key
+        OrderedDict.__delitem__(od, new_key)
+
+    if PY2:
+        # modify internal variables
+        _map = od._OrderedDict__map
+        link = _map[key]
+        link[2] = new_key
+        del _map[key]
+        _map[new_key] = link
+        val = dict.pop(od, key)
+        if args:
+            val = value
+        dict.__setitem__(od, new_key, val)
+
+    else:
+        # in PY3, OrderedDict is implemented in C
+        # no access to private variables __map
+        found = False
+        keys = [] # keys after key
+        for k in od:
+            if k == key:
+                found = True
+                continue
+            if found:
+                keys.append(k)
+        # warning: can not use OrderedDict.pop, which calls del self[key]
+        getitem = dict.__getitem__
+        setitem = OrderedDict.__setitem__
+        delitem = OrderedDict.__delitem__
+        v = getitem(od, key)
+        delitem(od, key)
+        if args:
+            v = value
+        setitem(od, new_key, v)
+        # shift keys to after new_key
+        for k in keys:
+            # od[k] = od.pop(k) # can not call this directly in MIDict
+            v = getitem(od, k)
+            delitem(od, k)
+            setitem(od, k, v)
+
+
+def od_reorder_keys(od, keys_in_new_order): # not used
+    '''
+    Reorder the keys in an OrderedDict ``od`` in-place.
+    '''
+    if set(od.keys()) != set(keys_in_new_order):
+        raise KeyError('Keys in the new order do not match existing keys')
+    for key in keys_in_new_order:
+        od[key] = od.pop(key)
+    return od
 
 
 def _MI_setitem(self, args, value):

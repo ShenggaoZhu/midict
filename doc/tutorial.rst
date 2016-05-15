@@ -92,7 +92,7 @@ slice      a range of keys (key_start:key_stop:step) list of values
 The elements in the tuple/list or ``key_start``/``key_stop`` in the slice
 syntax can be a normal index name or an ``int``.
 
-See ``IndexDict`` for more details.
+See :class:`midict.IndexDict` for more details.
 
 Using the above ``user`` example::
 
@@ -177,7 +177,7 @@ Python identifier (``d.key <==> d['key']``)::
 
     mi_dict.jack <==> mi_dict['jack']
 
-This feature is supported by ``AttrDict``.
+This feature is supported by :class:`midict.AttrDict`.
 
 Note that it treats an attribute as a dictionary key only when it can not
 find a normal attribute with that name. Thus, it is the programmer's
@@ -396,101 +396,10 @@ More examples of advanced indexing
 
 
 
+More classes and functions
+--------------------------
+Check :doc:`midict` for more classes and functions,
+such as :class:`midict.FrozenMIDict`, :class:`midict.AttrDict`, :class:`midict.IndexDict`,
+:class:`midict.MIDictView`, etc.
 
 
-midict.FrozenMIDict
--------------------
-
-An immutable, hashable multi-index dictionary (similar to ``MIDict``).
-
-
-midict.AttrDict
----------------
-
-A dictionary that can get/set/delete a key using the attribute syntax
-if it is a valid Python identifier. (``d.key`` <==> d['key'])
-
-Note that it treats an attribute as a dictionary key only when it can not
-find a normal attribute with that name. Thus, it is the programmer's
-responsibility to choose the correct syntax while writing the code.
-
-Be aware that besides all the inherited attributes, AttrDict has an
-additional internal attribute "_AttrDict__attr2item".
-
-Examples::
-
-    d = AttrDict(__init__='value for key "__init__"')
-    d.__init__ -> <bound method AttrDict.__init__>
-    d["__init__"] -> 'value for key "__init__"'
-
-
-midict.IndexDict
-----------------
-
-A dictionary that supports flexible indexing (get/set/delete) of
-multiple keys via an int, tuple, list or slice object.
-
-The type of a valid key in IndexDict should not be int, tuple, or NoneType.
-
-To index one or more items, use a proper ``item`` argument with the
-bracket syntax: ``d[item]``. The possible types and contents of ``item``
-as well as the corresponding values are summarized as follows:
-
-============= ================================== ======================
-    type        content of the ``item`` argument    corresponding values
-============= ================================== ======================
-int           the index of a key in d.keys()     the value of the key
-tuple/list    multiple keys or indices of keys   list of values
-slice         "key_start : key_stop : step"      list of values
-other types   a normal key                       the value of the key
-============= ================================== ======================
-
-The tuple/list syntax can mix keys with indices of keys.
-
-The slice syntax means a range of keys (like the normal list slicing),
-and the ``key_start`` and ``key_stop`` parameter can be a key, the index
-of a key, or None (which can be omitted).
-
-When setting items, the slice and int syntax (including int in the tuple/list
-syntax) can only be used to change values of existing keys, rather than
-set values for new keys.
-
-
-Examples::
-
-    d = IndexDict(a=1,b=2,c=3)
-
-    d -> {'a': 1, 'c': 3, 'b': 2}
-    d.keys() -> ['a', 'c', 'b']
-
-    d['a'] -> 1
-    d[0] -> 1
-    d['a','b'] <==> d[('a','b')] <==> d[['a','b']] -> [1, 2]
-    d[:] -> [1,3,2]
-    d['a':'b'] <==> d[0:2] <==> d['a':2] <==> d['a':-1] -> [1, 3]
-    d[0::2] -> [1, 2]
-
-    d[0] = 10 # d -> {'a': 10, 'c': 3, 'b': 2}
-    d['a':-1] = [10, 30] # d -> {'a': 10, 'c': 30, 'b': 2}
-
-    d[5] = 10 -> KeyError: 'Index out of range of keys: 5'
-
-
-
----------
-
-
-More docs are within the code. Go ahead the check it!
-
-
-
-TODO
----------
-
-check pandas.Index and other similar solutions
-
-implement using namedtuple and other types
-
-frosen/readonly version
-
-more tests

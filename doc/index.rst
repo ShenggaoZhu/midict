@@ -19,7 +19,7 @@ Quick example
 |  tony   |    2    |  192.2  |
 +---------+---------+---------+
 
-A multi-index dictionary can easily represent the above table-like data set::
+The above table-like data set (with multiple columns/indices) can be represented using a ``MIDict``::
 
     user = MIDict([['jack', 1, '192.1'], # list of items (rows of data)
                    ['tony', 2, '192.2']],
@@ -60,12 +60,13 @@ Installation
 
 ``pip install midict``
 
-Git Repo:  https://github.com/ShenggaoZhu/midict
+Source code:  https://github.com/ShenggaoZhu/midict
 
 
 
-Table of Contents:
-==================
+
+Documentation
+=============
 .. toctree::
    :maxdepth: 2
 

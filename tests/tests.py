@@ -14,6 +14,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from midict import *
+from midict import PY2, PY3 # not in midict.__all__
 
 
 def call(obj, func_name, *args, **kw):
@@ -193,15 +194,15 @@ class TestMIMapping(unittest.TestCase):
             for n in [names, ''.join(names)]: # single str '012'
                 d1 = MIDict(items, names)
                 d2 = MIDict(iter(items), iter(names))
-                
+
                 ds = [d1, d2]
-                if PY3: # zip is iter
-                    cols = list(zip(*items))
-                    d4 = MIDict(zip(*cols), names) 
-                    ds += [d4]
-                else:
+                if PY2: # zip is iter
                     d3 = MIDict(d1.viewitems(), iter(names))
                     ds += [d3]
+                else:
+                    cols = list(zip(*items))
+                    d4 = MIDict(zip(*cols), names)
+                    ds += [d4]
 
                 for d in ds:
                     self.assertEqual(list(d.indices.keys()), names)
@@ -847,7 +848,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
 
         for x in [1, dn, ds, dct]:
             self.assertNotEqual(d, x)
-        if PY2: 
+        if PY2:
             self.assertLess(d, dct)
             self.assertGreater(dct, d)
             for x in [1, dn, ds]:
@@ -860,7 +861,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
                 for m in ['__lt__',  '__gt__', '__le__','__ge__']:
                     with self.assertRaises(TypeError):
                         call(d, m, x)
-                        
+
     def test_repr(self):
         for cls in [MIMapping, MIDict, FrozenMIDict]:
             d0 = cls()
@@ -952,7 +953,7 @@ class TestMIDict_3_Indices(unittest.TestCase):
             funcs_all = funcs + funcs_views
         else:
             funcs_all = funcs
-        
+
         for k in range(N):
             gt = [it[k] for it in items]
             for i in [k, names[k]]:
@@ -974,14 +975,14 @@ class TestMIDict_3_Indices(unittest.TestCase):
                 self.assertEqual(list(call(d, fv)), gt)
             else:
                 self.assertEqual(list(call(d, f)), gt)
-                
+
             v_not_exist = None
             if PY2:
                 for fn in [f, fv]:
                     self.assertNotIn(v_not_exist, call(d, fn))
             else:
                 self.assertNotIn(v_not_exist, call(d, f))
-                
+
         for i in [index_not_exist, N + 10, -N - 10]:
             for f in funcs_all:
                 with self.assertRaises(KeyError):

@@ -1,50 +1,65 @@
+.. _midict-API:
+
 midict package API
 ==================
 
-.. module:: midict
+.. currentmodule:: midict
 
 midict.AttrDict
 ---------------
 
 .. autoclass:: AttrDict
-    :members:
-    :special-members:
-    :show-inheritance:
-    :noindex:
+.. autoclass:: AttrOrdDict
 
 
 midict.IndexDict
 ----------------
 
 .. autoclass:: IndexDict
-    :members:
-    :special-members:
-    :show-inheritance:
-    :noindex:
+.. autoclass:: IdxOrdDict
+
 
 midict.MIMapping
 ----------------
 
 .. autoclass:: MIMapping
-    :members:
-    :special-members:
-    :show-inheritance:
-    :noindex:
+
 
 midict.MIDict
 -------------
 
 .. autoclass:: MIDict
-    :members:
-    :special-members:
-    :show-inheritance:
-    :noindex:
+
 
 midict.FrozenMIDict
 -------------------
 
 .. autoclass:: FrozenMIDict
-    :members:
-    :special-members:
-    :show-inheritance:
-    :noindex:
+
+
+Exceptions
+----------
+
+.. autoexception:: MIMappingError
+.. autoexception:: ValueExistsError
+
+
+Dict views
+----------
+
+.. autoclass:: MIKeysView
+.. autoclass:: MIValuesView
+.. autoclass:: MIItemsView
+.. autoclass:: MIDictView
+
+
+Auxiliary functions
+-------------------
+
+.. automodule:: midict
+    :exclude-members: OrderedDict, AttrDict, AttrOrdDict, IndexDict, IdxOrdDict,
+        MIMapping, MIDict, FrozenMIDict, MIMappingError, ValueExistsError,
+        MIKeysView, MIValuesView, MIItemsView, MIDictView
+
+    .. autofunction:: _MI_init
+    .. autofunction:: _MI_setitem

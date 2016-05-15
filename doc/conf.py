@@ -53,6 +53,9 @@ autosummary_generate = True
 napoleon_include_private_with_doc = True
 napoleon_include_special_with_doc = True
 
+
+autodoc_default_flags = ['members', 'private-members', 'special-members', 'show-inheritance']
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -310,3 +313,15 @@ texinfo_documents = [
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {'https://docs.python.org/': None}
+
+
+
+def autodoc_skip_member(app, what, name, obj, skip, options):
+    exclusions = ('__weakref__',  # special-members
+                  '__doc__', '__module__', '__dict__',  # undoc-members
+                  )
+    exclude = name in exclusions
+    return skip or exclude
+
+def setup(app):
+    app.connect("autodoc-skip-member", autodoc_skip_member)
