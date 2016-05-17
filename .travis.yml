@@ -8,10 +8,15 @@ python:
   - "3.5"
   # - "nightly" # currently points to 3.6-dev
 
+install:
+  - pip install coveralls
 
 # command to run tests
 script:
-  - python tests/tests.py
+  - coverage run tests/tests.py
+
+after_success:
+  coveralls
 
 
 notifications:
