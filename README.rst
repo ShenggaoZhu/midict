@@ -8,6 +8,44 @@ and suitable as a bidirectional/inverse dict (a drop-in replacement
 for dict/OrderedDict in Python 2 & 3).
 
 
+Status
+------
+
+.. image:: https://img.shields.io/pypi/l/midict.svg
+    :alt: License
+    :target: ./LICENSE
+
+.. image:: https://img.shields.io/pypi/v/midict.svg
+    :target: https://pypi.python.org/pypi/midict
+    :alt: PyPI Release
+
+.. image:: https://img.shields.io/pypi/pyversions/midict.svg
+    :target: https://pypi.python.org/pypi/midict
+    :alt: Supported Python versions
+
+.. image:: https://img.shields.io/pypi/dm/midict.svg
+    :target: https://pypi.python.org/pypi/midict
+    :alt: PyPI Downloads
+
+.. image:: https://readthedocs.org/projects/midict/badge/?version=latest
+    :target: https://midict.readthedocs.org/
+    :alt: Documentation
+
+.. image:: https://travis-ci.org/ShenggaoZhu/midict.svg?branch=master
+    :target: https://travis-ci.org/ShenggaoZhu/midict
+    :alt: Travis Build Status
+
+.. image:: https://coveralls.io/repos/github/ShenggaoZhu/midict/badge.svg?branch=master
+    :target: https://coveralls.io/github/ShenggaoZhu/midict?branch=master
+    :alt: Test coverage
+
+
+.. image:: https://api.codacy.com/project/badge/Grade/206345cabe8f44598c3632fb0a553eb1
+    :target: https://www.codacy.com/app/zshgao/midict
+    :alt: Code quality
+
+
+
 Features
 --------
 
@@ -84,7 +122,7 @@ A ``MIDict`` with 2 indices can be used as a bidirectional/inverse dict:
 Documentation
 -------------
 
-See http://midict.readthedocs.io
+See https://midict.readthedocs.io
 
 
 Installation
