@@ -15,6 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from midict import *
 from midict import PY2, PY3 # not in midict.__all__
+if PY3:
+    from midict import map
 
 
 def call(obj, func_name, *args, **kw):
