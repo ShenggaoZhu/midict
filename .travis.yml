@@ -13,7 +13,7 @@ install:
 
 # command to run tests
 script:
-  - coverage run tests/tests.py
+  - coverage run --source midict tests/tests.py
 
 after_success:
   coveralls

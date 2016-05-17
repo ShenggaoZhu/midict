@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, print_function #, unicode_lite
 
 import sys
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 
 PY2 = sys.version_info[0] == 2
@@ -1199,10 +1199,7 @@ class MIMapping(AttrOrdDict):
                     yield x
 
         else:
-            if index is None:
-                for x in ():
-                    yield x
-            else:
+            if index is not None:
                 raise KeyError('Index not found (dictionary is empty): %s' % (index,))
 
 
@@ -1219,10 +1216,7 @@ class MIMapping(AttrOrdDict):
                 for x in reversed(self.indices[index]):
                     yield x
         else:
-            if index is None:
-                for x in ():
-                    yield x
-            else:
+            if index is not None:
                 raise KeyError('Index not found (dictionary is empty): %s' % (index,))
 
 
@@ -1683,10 +1677,7 @@ class MIDictView(KeysView):
             for x in self._mapping.iterkeys(index):
                 yield x
         else:
-            if index is None:
-                for x in ():
-                    yield x
-            else:
+            if index is not None:
                 raise KeyError('Index not found (dictionary is empty): %s' % (index,))
 
     def iteritems(self):
@@ -1695,9 +1686,6 @@ class MIDictView(KeysView):
                 0 if self.index_key is None else self.index_key,
                 -1 if self.index_value is None else self.index_value])
             for x in items:
-                yield x
-        else:
-            for x in ():
                 yield x
 
     def keys(self):

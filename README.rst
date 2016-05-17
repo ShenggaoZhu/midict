@@ -138,9 +138,9 @@ Source code:  https://github.com/ShenggaoZhu/midict
 
 Report issues: https://github.com/ShenggaoZhu/midict/issues/new
 
-Test
-^^^^
+Testing
+^^^^^^^
 
 ``python tests/tests.py``
 
-Tested with both Python 2.7 and Python 3.5.
+Tested with both Python 2.7 and Python 3,3, 3.4, 3.5.
