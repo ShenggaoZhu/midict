@@ -33,13 +33,17 @@ Quickstart
 |  tony   |    2    |  192.2  |
 +---------+---------+---------+
 
-The above table-like data set (with multiple columns/indices) can be represented using a ``MIDict``::
+The above table-like data set (with multiple columns/indices) can be represented using a ``MIDict``:
+
+.. code-block:: python3
 
     user = MIDict([['jack', 1, '192.1'], # list of items (rows of data)
                    ['tony', 2, '192.2']],
                   ['name', 'uid', 'ip']) # a list of index names
 
-Access a key and get a value or a list of values (similar to a normal ``dict``)::
+Access a key and get a value or a list of values (similar to a normal ``dict``):
+
+.. code-block:: python3
 
     user['jack'] -> [1, '192.1']
 
@@ -47,7 +51,9 @@ Any index (column) can be used as the "keys" or "values" via the advanced
 "multi-indexing" syntax ``d[index_key:key, index_value]``.
 Both ``index_key`` and ``index_value`` can be a normal index name
 or an ``int`` (the order the index), and ``index_value`` can also be a
-``tuple``, ``list`` or ``slice`` object to specify multiple values, e.g.::
+``tuple``, ``list`` or ``slice`` object to specify multiple values, e.g.:
+
+.. code-block:: python3
 
     user['name':'jack', 'uid'] -> 1
     user['ip':'192.1', 'name'] -> 'jack'
@@ -56,13 +62,17 @@ or an ``int`` (the order the index), and ``index_value`` can also be a
     user[0:'jack', [1, 2]] -> [1, '192.1']
     user['name':'jack', 'uid':] -> [1, '192.1']
 
-The "multi-indexing" syntax also has convenient shortcuts::
+The "multi-indexing" syntax also has convenient shortcuts:
+
+.. code-block:: python3
 
     user['jack'] -> [1, '192.1']
     user[:'192.1'] -> ['jack', 1]
     user['jack', :] -> ['jack', 1, '192.1']
 
-A ``MIDict`` with 2 indices can be used as a bidirectional/inverse dict::
+A ``MIDict`` with 2 indices can be used as a bidirectional/inverse dict:
+
+.. code-block:: python3
 
     mi_dict = MIDict(jack=1, tony=2)
     mi_dict['jack'] -> 1 # forward indexing: d[key] -> value
@@ -73,7 +83,7 @@ A ``MIDict`` with 2 indices can be used as a bidirectional/inverse dict::
 Documentation
 -------------
 
-See https://midict.readthedocs.io
+See http://midict.readthedocs.io
 
 
 Installation
@@ -89,7 +99,8 @@ Source code:  https://github.com/ShenggaoZhu/midict
 
 Report issues: https://github.com/ShenggaoZhu/midict/issues/new
 
-**Test**
+Test
+^^^^
 
 ``python tests/tests.py``
 
