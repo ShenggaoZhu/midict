@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, print_function #, unicode_lite
 
 import sys
 
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
 
 PY2 = sys.version_info[0] == 2
