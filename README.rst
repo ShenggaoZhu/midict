@@ -129,6 +129,7 @@ Installation
 
 ``pip install midict``
 
+PyPI repository: https://pypi.python.org/pypi/midict
 
 Development
 -----------

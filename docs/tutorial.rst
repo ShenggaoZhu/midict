@@ -394,12 +394,20 @@ More examples of advanced indexing
                      ['uid', 'name', 'ip'])
 
 
-
-
 More classes and functions
 --------------------------
 Check :doc:`midict` for more classes and functions,
 such as :class:`midict.FrozenMIDict`, :class:`midict.AttrDict`, :class:`midict.IndexDict`,
 :class:`midict.MIDictView`, etc.
+
+
+Related libraries
+-----------------
+* `bidict <https://pypi.python.org/pypi/bidict>`_ provides bidirectional/inverse mapping via the ``d.inv`` attribute.
+* `multi\_key\_dict <https://pypi.python.org/pypi/multi_key_dict>`_ maps multiple keys to the same value.
+* `orderedmultidict <https://pypi.python.org/pypi/orderedmultidict>`_ stores multiple values for the same key.
+* `mdict <https://pypi.python.org/pypi/mdict>`_ retrieves and stores values in nested python dicts.
+* `pandas <http://pandas.pydata.org/>`_ has a hierarchical/multi-level indexing feature
+  (`pandas.MultiIndex <http://pandas.pydata.org/pandas-docs/stable/advanced.html#multiindex-advanced-indexing>`_).
 
 
