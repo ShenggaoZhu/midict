@@ -68,11 +68,9 @@ setup(
 #    download_url = 'https://codeload.github.com/ShenggaoZhu/midict/zip/v0.1.1',
     license='MIT',
     description=
-        'MIDict is an ordered "dictionary" with multiple indices '
-        'where any index can serve as "keys" or "values", '
-        'capable of assessing multiple values via its powerful indexing syntax, '
-        'and suitable as a bidirectional/inverse dict (a drop-in replacement '
-        'for dict/OrderedDict in Python 2 & 3).',
+        'MIDict (Multi-Index Dict) can be indexed by any "keys" or "values", suitable as a '
+        'bidirectional/inverse dict or a multi-key/multi-value dict (a drop-in replacement '
+        'for dict in Python 2 & 3).',
     long_description=long_description,
     author=UltraMagicString('Shenggao Zhu'),
     author_email='zshgao@gmail.com',
