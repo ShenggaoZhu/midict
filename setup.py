@@ -65,7 +65,7 @@ setup(
     name=package_name,
     version=find_version(package_name, '__init__.py'),
     url='https://github.com/ShenggaoZhu/midict',
-    download_url = 'https://codeload.github.com/ShenggaoZhu/midict/zip/v0.1.1',
+#    download_url = 'https://codeload.github.com/ShenggaoZhu/midict/zip/v0.1.1',
     license='MIT',
     description=
         'MIDict is an ordered "dictionary" with multiple indices '

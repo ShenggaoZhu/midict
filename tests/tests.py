@@ -55,6 +55,7 @@ def get_data3(cls=MIDict):
 
 # run command line:
 # !coverage run tests/tests.py;coverage report;coverage html
+# !coverage run --source midict tests/tests.py;coverage report;coverage html
 
 #==============================================================================
 # test cases
