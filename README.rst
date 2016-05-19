@@ -111,10 +111,10 @@ A ``MIDict`` with 2 indices can be used as a bidirectional/inverse dict:
 
 .. code-block:: python
 
-    mi_dict = MIDict(jack=1, tony=2)
+    color = MIDict(red='#FF0000', green='#00FF00')
 
-    mi_dict['jack'] == 1 # forward indexing: d[key] -> value
-    mi_dict[:1]     == 'jack' # backward/inverse indexing: d[:value] -> key
+    color['red']      == '#FF0000' # forward indexing: d[key] -> value
+    color[:'#FF0000'] == 'red'     # backward/inverse indexing: d[:value] -> key
 
 
 
